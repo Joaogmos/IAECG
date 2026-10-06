@@ -1,6 +1,31 @@
+# Ambiente
 .venv/
-dados/*.hdf5
-dados/*.zip
-*.pt
-*Zone.Identifier
+venv/
 __pycache__/
+*.pyc
+.ipynb_checkpoints/
+*Zone.Identifier
+.DS_Store
+Thumbs.db
+
+# Dados (grandes, ficam no Drive)
+dados/
+*.hdf5
+*.h5
+*.zip
+*.npy
+*.npz
+exams*.csv
+
+# Modelos e saídas
+*.pt
+*.pth
+*.ckpt
+resultados/
+runs/
+wandb/
+
+# Figuras finais escolhidas vão em figuras/ (versionado)
+
+# Instruções pessoais do Claude Code
+CLAUDE.local.md
