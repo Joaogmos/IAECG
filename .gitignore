@@ -1,0 +1,6 @@
+.venv/
+dados/*.hdf5
+dados/*.zip
+*.pt
+*Zone.Identifier
+__pycache__/
