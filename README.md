@@ -24,7 +24,7 @@ Este projeto propõe uma abordagem inovadora utilizando **Deep Learning**. Como 
 Os dados utilizados neste projeto pertencem ao dataset CODE, uma base de dados em larga escala contendo exames de ECG reais oriundos da rede de telessaúde de Minas Gerais. 
 
 * **Formato dos Dados:** Os sinais brutos (12 derivações) estão armazenados em ficheiros `.hdf5`, e os metadados e os rótulos de diagnóstico encontram-se no ficheiro `exams.csv`.
-* **Pré-processamento:** O pipeline do projeto realiza a extração dos sinais, normalização (`StandardScaler`) e um balanceamento estratificado rigoroso (2.000 amostras por classe) para lidar com o forte desbalanceamento natural da base de dados.
+* **Pré-processamento:** O pipeline realiza a extração dos sinais, normalização z-score por derivação, balanceamento (até 2.000 exames por classe) e divisão 70/15/15 **por paciente**, para que nenhum paciente apareça em mais de um conjunto.
 * *Nota:* Devido ao limite de armazenamento do GitHub, os ficheiros `.hdf5` originais não estão no repositório.
 
 ## Datasets
@@ -42,20 +42,37 @@ O modelo `TransformerECG` foi construído do zero utilizando **PyTorch**. O flux
 3. **Transformer Encoder:** 4 camadas com 4 cabeças de atenção (*Multi-Head Attention*) para captar dependências globais e de longo alcance no batimento cardíaco.
 4. **Classification Head:** Camada linear final que converte a representação para os logits das 7 classes.
 
+Variante híbrida (`python transformer_ecg.py --hibrido`): 3 convoluções extraem a morfologia local (tokens de 40 ms) antes das camadas de atenção.
+
 ### ResNet 1D (`cnn1d_ecg.py`, baseline)
-Baseado em Ribeiro et al. (2020). Resultados preliminares: treino ~100%, validação ~82% (overfitting em estudo). Gráficos em `figuras/cnn1d/`.
+Baseado em Ribeiro et al. (2020). Resultados atualizados em `docs/tabelas/tabelas.md` e gráficos em `figuras/cnn1d/`.
+
+## Resultados (conjunto de teste, média ± desvio de 3 sementes)
+| Modelo | Acurácia | F1 macro | AUC macro | Parâmetros |
+|---|---|---|---|---|
+| Transformer 1D | 87,9 ± 0,8% | 87,7 ± 0,8% | 0,983 | 0,9 M |
+| Transformer híbrido | 89,6 ± 0,6% | 89,5 ± 0,6% | 0,986 | 1,1 M |
+| CNN 1D ResNet | 93,4 ± 0,4% | 93,3 ± 0,4% | 0,989 | 6,8 M |
 
 ## Organização do Repositório
-* `transformer_ecg.py`, `cnn1d_ecg.py`: scripts de treino.
-* `dados/`: dados locais e saídas de treino (fora do Git).
+* `comum_ecg.py`: dados, divisão por paciente, treino e avaliação (compartilhado pelos dois modelos).
+* `transformer_ecg.py`, `cnn1d_ecg.py`: arquiteturas e scripts de treino.
+* `gerar_tabelas.py`: tabelas de resultados (Markdown/CSV) e figuras para o pôster.
+* `figuras_relatorio.py`: figuras de ECG, distribuição das classes e fluxo do projeto.
+* `dados/`: dados locais (fora do Git). `resultados/`: saídas de treino (fora do Git).
 * `figuras/`: gráficos finais para pôster e relatório.
-* `docs/`: relatório e pôster.
+* `docs/`: guias da equipe, registro de experimentos, relatório e pôster.
 * `CLAUDE.md`: contexto do projeto para o Claude Code.
 
 ## Como Executar
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
+pip install torch --index-url https://download.pytorch.org/whl/cu128   # GPU NVIDIA
 pip install -r requirements.txt
-python cnn1d_ecg.py   # ou python transformer_ecg.py
+python cnn1d_ecg.py          # baseline
+python transformer_ecg.py    # modelo principal
+python gerar_tabelas.py      # tabelas em docs/tabelas/tabelas.md
+python figuras_relatorio.py  # figuras em figuras/relatorio/
 ```
+Para repetir com outra semente: `python transformer_ecg.py --semente 7`.
