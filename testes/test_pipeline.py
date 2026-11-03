@@ -142,3 +142,12 @@ def test_ensemble_salva_e_recarrega():
     with torch.no_grad():
         media = torch.stack([torch.sigmoid(m(x)) for m in membros]).mean(0)
         assert torch.allclose(torch.sigmoid(copia(x)), media, atol=1e-5)
+
+
+def test_erro_calibracao():
+    from comum_ecg import erro_calibracao
+    gerador = np.random.default_rng(4)
+    p = gerador.random(20000)
+    calibrado = (gerador.random(20000) < p).astype(float)       # y ~ Bernoulli(p)
+    assert erro_calibracao(calibrado, p) < 0.02
+    assert erro_calibracao(calibrado, p ** 3) > 0.1             # probabilidades distorcidas

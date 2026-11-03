@@ -358,6 +358,20 @@ def metricas_por_limiar(y, p, limiar):
     }
 
 
+def erro_calibracao(y, p, faixas=10):
+    """
+    ECE: diferença média entre a probabilidade dada e a frequência real, em 10
+    faixas de probabilidade (ponderada pelo nº de exames). 0 = "70%" acerta 70% das vezes.
+    """
+    faixa = np.minimum((p * faixas).astype(int), faixas - 1)
+    erro = 0.0
+    for b in range(faixas):
+        dentro = faixa == b
+        if dentro.any():
+            erro += dentro.mean() * abs(p[dentro].mean() - y[dentro].mean())
+    return float(erro)
+
+
 def avaliar(probs, rotulos, limiares, nomes=SAIDAS):
     """Métricas por classe (AUC, AP e as do limiar) + médias macro das 6 doenças."""
     por_classe = {}
@@ -370,6 +384,7 @@ def avaliar(probs, rotulos, limiares, nomes=SAIDAS):
             'prevalencia': float(y.mean()),
             'auc':         float(roc_auc_score(y, p)) if tem_os_dois else None,
             'ap':          float(average_precision_score(y, p)) if tem_os_dois else None,
+            'ece':         erro_calibracao(y, p),
             'equilibrado': metricas_por_limiar(y, p, limiares['equilibrado'][j]),
             'triagem':     metricas_por_limiar(y, p, limiares['triagem'][j]),
         }
@@ -379,6 +394,7 @@ def avaliar(probs, rotulos, limiares, nomes=SAIDAS):
     resumo = {
         'auc_macro':  media(lambda c: c['auc']),
         'ap_macro':   media(lambda c: c['ap']),
+        'ece_macro':  media(lambda c: c['ece']),
         'f1_macro':   media(lambda c: c['equilibrado']['f1']),
         'sensibilidade_macro':  media(lambda c: c['equilibrado']['sensibilidade']),
         'especificidade_macro': media(lambda c: c['equilibrado']['especificidade']),
