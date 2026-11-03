@@ -2,7 +2,7 @@
 # ECG CNN 1D (ResNet) — Classificação de Arritmias Cardíacas
 # Dataset: CODE-15% (Rede de Telessaúde de Minas Gerais — TNMG)
 # Modelo: ResNet 1D de Ribeiro et al. (2020), Nature Communications 11:1760
-# Tarefa: Multiclass — Normal + 6 arritmias (7 classes)
+# Tarefa: Multirrótulo — 6 alterações + ECG normal (7 sigmoides, protocolo v3)
 #
 # CONTEXTO DO TCC
 #   O TCC desenvolve uma IA que lê ECGs de 12 derivações e classifica o
@@ -25,7 +25,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from comum_ecg import NUM_CLASSES, preparar_dados, treinar_e_avaliar
+from comum_ecg import NUM_SAIDAS, preparar_dados, treinar_e_avaliar
 
 # Hiperparâmetros do modelo — ResNet 1D (Ribeiro et al., 2020)
 NUM_DERIVACOES   = 12
@@ -85,7 +85,7 @@ class BlocoResidual1D(nn.Module):
 
 class ResNet1DECG(nn.Module):
     """
-    CNN 1D para classificação multiclass de ECG (7 classes).
+    CNN 1D para classificação multirrótulo de ECG (7 saídas).
     Entrada: (batch, 4096, 12) — mesmo formato do Transformer.
 
     Fluxo:
@@ -96,8 +96,9 @@ class ResNet1DECG(nn.Module):
       Bloco 4 (256→320) →   16
       Flatten (320×16 = 5120) → Linear → 7 logits
 
-    Única mudança em relação ao artigo: a saída é softmax de 7 classes
-    exclusivas (aqui) em vez de 6 sigmoides independentes (multi-label).
+    Como no artigo, cada saída é uma sigmoide independente (multirrótulo);
+    a única diferença é a 7ª saída, "ECG normal", que separa o exame normal
+    do exame com outra alteração fora das 6 estudadas.
     """
     def __init__(self):
         super().__init__()
@@ -112,7 +113,7 @@ class ResNet1DECG(nn.Module):
             self.blocos.append(
                 BlocoResidual1D(FILTROS[i - 1], FILTROS[i], reducao, TAMANHO_KERNEL, DROPOUT))
 
-        self.classificador = nn.Linear(FILTROS[-1] * COMPRIMENTOS[-1], NUM_CLASSES)
+        self.classificador = nn.Linear(FILTROS[-1] * COMPRIMENTOS[-1], NUM_SAIDAS)
 
     def forward(self, sinal):
         x = sinal.permute(0, 2, 1)                       # (B, 4096, 12) → (B, 12, 4096)
@@ -127,13 +128,15 @@ class ResNet1DECG(nn.Module):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--semente', type=int, default=42)
+    parser.add_argument('--limite', type=int, default=None,
+                        help='usa só N exames (teste rápido do pipeline)')
     args = parser.parse_args()
 
     torch.manual_seed(args.semente)
     np.random.seed(args.semente)
     torch.backends.cudnn.benchmark = True        # entrada de tamanho fixo → cuDNN escolhe a conv mais rápida
 
-    dados = preparar_dados()
+    dados = preparar_dados(args.limite)
     treinar_e_avaliar(
         nome='cnn1d', titulo='CNN 1D (ResNet)',
         modelo=ResNet1DECG(), taxa_aprendizado=TAXA_APRENDIZADO,

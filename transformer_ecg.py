@@ -2,7 +2,7 @@
 # ECG TRANSFORMER — Classificação de Arritmias Cardíacas
 # Dataset: CODE-15% (Rede de Telessaúde de Minas Gerais — TNMG)
 # Modelo: Vision Transformer adaptado para sinais 1D (ECG) — MODELO PRINCIPAL
-# Tarefa: Multiclass — Normal + 6 arritmias (7 classes)
+# Tarefa: Multirrótulo — 6 alterações + ECG normal (7 sigmoides, protocolo v3)
 #
 # Dados, divisão, treino e avaliação ficam em comum_ecg.py (idênticos aos da
 # CNN 1D). Este arquivo só define a arquitetura (Etapa 5) e a taxa de aprendizado.
@@ -17,7 +17,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from comum_ecg import NUM_CLASSES, preparar_dados, treinar_e_avaliar
+from comum_ecg import NUM_SAIDAS, preparar_dados, treinar_e_avaliar
 
 # Hiperparâmetros do modelo
 TAMANHO_PATCH    = 64       # 4096 amostras / 64 = 64 patches de 160 ms
@@ -76,7 +76,7 @@ class EmbeddingConvolucional(nn.Module):
 
 class TransformerECG(nn.Module):
     """
-    Transformer para classificação multiclass de ECG (7 classes).
+    Transformer para classificação multirrótulo de ECG (7 saídas).
     Fluxo: Patch Embedding → CLS Token → Positional Emb →
            Transformer Encoder × 4 → CLS → Cabeça Linear → 7 logits
     hibrido=True troca o Patch Embedding pelo EmbeddingConvolucional.
@@ -107,7 +107,7 @@ class TransformerECG(nn.Module):
             nn.Linear(DIMENSAO_MODELO, 64),
             nn.GELU(),
             nn.Dropout(DROPOUT),
-            nn.Linear(64, NUM_CLASSES)
+            nn.Linear(64, NUM_SAIDAS)
         )
 
         self._inicializar_pesos()
@@ -130,6 +130,8 @@ class TransformerECG(nn.Module):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--semente', type=int, default=42)
+    parser.add_argument('--limite', type=int, default=None,
+                        help='usa só N exames (teste rápido do pipeline)')
     parser.add_argument('--hibrido', action='store_true',
                         help='usa 3 convoluções antes da atenção (tokens de 40 ms)')
     args = parser.parse_args()
@@ -137,7 +139,7 @@ if __name__ == '__main__':
     torch.manual_seed(args.semente)
     np.random.seed(args.semente)
 
-    dados = preparar_dados()
+    dados = preparar_dados(args.limite)
     treinar_e_avaliar(
         nome='transformer_hibrido' if args.hibrido else 'transformer',
         titulo='Transformer híbrido (Conv + Transformer)' if args.hibrido else 'Transformer 1D',
