@@ -56,6 +56,7 @@ PASTA_RAIZ       = os.path.dirname(os.path.abspath(__file__))
 PASTA_DADOS      = os.path.join(PASTA_RAIZ, 'dados')
 ARQUIVO_CSV      = os.path.join(PASTA_DADOS, 'exams.csv')
 PASTA_CODE_TEST  = os.path.join(PASTA_DADOS, 'code_test', 'data')
+PASTA_PTBXL      = os.path.join(PASTA_DADOS, 'ptbxl')
 PASTA_RESULTADOS = os.path.join(PASTA_RAIZ, 'resultados')
 
 PROTOCOLO = 'v3'
@@ -244,6 +245,48 @@ def carregar_code_test():
         sinais = normalizar_sinais(f['tracings'][:][..., ORDEM_CODE_TEST])
     ouro = pd.read_csv(os.path.join(PASTA_CODE_TEST, 'annotations', 'gold_standard.csv'))
     return sinais, ouro[DOENCAS].to_numpy(dtype=np.float32)
+
+
+# Códigos SCP do PTB-XL equivalentes às nossas saídas. RBBB/LBBB = bloqueio completo
+# (QRS >= 120 ms), como no CODE; o incompleto (IRBBB, ILBBB) não conta.
+CODIGOS_PTBXL = {'1dAVb': '1AVB', 'RBBB': 'CRBBB', 'LBBB': 'CLBBB', 'SB': 'SBRAD',
+                 'ST': 'STACH', 'AF': 'AFIB', 'Normal': 'NORM'}
+
+
+def carregar_ptbxl():
+    """
+    PTB-XL (Alemanha, 21.799 ECGs de 10 s a 500 Hz, laudo de cardiologistas): validação
+    externa com outro equipamento e outra população. Nenhum exame foi usado no treino,
+    então entram todos. Reamostra para 400 Hz e centraliza em 4.096 amostras;
+    cache em dados/ptbxl/cache_ptbxl.npy (float16, ~2 GB) para não reler os WFDB.
+    """
+    import ast
+    from scipy.signal import resample_poly
+    arquivo_csv = os.path.join(PASTA_PTBXL, 'ptbxl_database.csv')
+    if not os.path.exists(arquivo_csv):
+        return None
+    df = pd.read_csv(arquivo_csv, index_col='ecg_id')
+    codigos = df['scp_codes'].map(ast.literal_eval)
+    rotulos = np.array([[float(CODIGOS_PTBXL[s] in c) for s in SAIDAS] for c in codigos], dtype=np.float32)
+
+    arquivo_cache = os.path.join(PASTA_PTBXL, 'cache_ptbxl.npy')
+    if not os.path.exists(arquivo_cache):
+        import wfdb
+        print(f"Lendo {len(df):,} exames do PTB-XL (só na 1ª vez)...", flush=True)
+        cache = np.lib.format.open_memmap(arquivo_cache + '.tmp', mode='w+', dtype=np.float16,
+                                          shape=(len(df), NUM_AMOSTRAS, NUM_DERIVACOES))
+        for i, caminho in enumerate(df['filename_hr']):
+            registro = wfdb.rdrecord(os.path.join(PASTA_PTBXL, caminho))
+            assert [n.upper() for n in registro.sig_name] == \
+                ['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+            sinal = resample_poly(np.nan_to_num(registro.p_signal), 4, 5, axis=0)   # 500 → 400 Hz
+            falta = NUM_AMOSTRAS - len(sinal)
+            sinal = np.pad(sinal, ((falta // 2, falta - falta // 2), (0, 0)))
+            cache[i] = normalizar_sinais(sinal)
+        cache.flush()
+        del cache
+        os.replace(arquivo_cache + '.tmp', arquivo_cache)
+    return np.load(arquivo_cache, mmap_mode='r'), rotulos
 
 # =============================================================================
 # ETAPA 4 — CARREGADOR DE LOTES E DATA AUGMENTATION
@@ -632,12 +675,23 @@ def avaliacao_final(nome, titulo, modelo, taxa_aprendizado, dados, semente, conf
         for leitor, f1 in code_test['comparacao_f1'].items():
             print(f"  F1 macro — {leitor:28s}: {f1['macro']:.3f}")
 
+    ptbxl = None
+    externo = carregar_ptbxl()
+    if externo is not None:
+        sinais_px, rotulos_px = externo
+        probs_px = prever(modelo, lotes_em_memoria(sinais_px))
+        resumo_px, por_classe_px = avaliar(probs_px, rotulos_px, limiares)
+        ptbxl = {'resumo': resumo_px, 'por_classe': por_classe_px}
+        print(f"\nPTB-XL (externo, Alemanha, {len(rotulos_px):,} exames): AUC {resumo_px['auc_macro']:.4f} "
+              f"| AP {resumo_px['ap_macro']:.4f} | F1 {resumo_px['f1_macro']:.4f}")
+
     df = dados['df']
     metricas = {
         'modelo': titulo, 'nome': nome, 'semente': semente, 'protocolo': PROTOCOLO,
         **resumo_teste,
         'por_classe':        por_classe_teste,
         'code_test':         code_test,
+        'ptbxl':             ptbxl,
         'limiares':          limiares,
         'melhor_ap_val':     melhor_ap,
         'epocas_treinadas':  len(historico['perda_treino']) if historico else None,   # None = ensemble
@@ -710,6 +764,7 @@ def avaliacao_final(nome, titulo, modelo, taxa_aprendizado, dados, semente, conf
                               'normalizacao': 'zscore_por_derivacao'},
         'metricas_teste': {k: metricas[k] for k in ['auc_macro', 'ap_macro', 'f1_macro']},
         'metricas_code_test': code_test['resumo'] if code_test else None,
+        'metricas_ptbxl':     ptbxl['resumo'] if ptbxl else None,
     }, os.path.join(pasta_saida, 'modelo_final.pt'))
 
     print(f"\nArquivos gerados em: {pasta_saida}")

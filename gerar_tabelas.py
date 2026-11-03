@@ -139,12 +139,25 @@ if com_code_test:
     tabela_code_test_auc = tabela_por_classe(lambda c: c['auc'], 'AUC', siglas=DOENCAS, porcentagem=False,
                                              fonte=lambda e: e['code_test']['por_classe'])
 
+# ----- Tabela 8: PTB-XL (Alemanha, outro equipamento) -----
+tabela_ptbxl = None
+if all(e.get('ptbxl') for e in execucoes):
+    fonte_px = lambda e: e['ptbxl']['por_classe']
+    tabela_ptbxl = pd.concat([
+        tabela_por_classe(lambda c: c['auc'], 'AUC', porcentagem=False, fonte=fonte_px),
+        tabela_por_classe(lambda c: c['equilibrado']['f1'], 'F1 (%)', fonte=fonte_px).drop(columns='Classe'),
+        tabela_por_classe(lambda c: c['equilibrado']['sensibilidade'], 'Sens. (%)', fonte=fonte_px).drop(columns='Classe'),
+    ], axis=1)
+    tabela_ptbxl.insert(1, 'Positivos', [ref['ptbxl']['por_classe'][s]['suporte'] for s in SAIDAS])
+
 # ----- Salvar -----
 tabelas = [('tabela_dataset.csv', tabela_dataset), ('tabela_comparacao.csv', tabela_comparacao),
            ('tabela_auc_por_classe.csv', tabela_auc), ('tabela_f1_por_classe.csv', tabela_f1),
            ('tabela_sens_espec.csv', tabela_clinica)]
 if tabela_code_test is not None:
     tabelas += [('tabela_code_test_f1.csv', tabela_code_test), ('tabela_code_test_auc.csv', tabela_code_test_auc)]
+if tabela_ptbxl is not None:
+    tabelas += [('tabela_ptbxl.csv', tabela_ptbxl)]
 for nome_arquivo, tabela in tabelas:
     tabela.to_csv(os.path.join(PASTA_TABELAS, nome_arquivo), index=False, encoding='utf-8-sig')
 
@@ -168,6 +181,10 @@ if tabela_code_test is not None:
     texto += ['## Tabela 6 — CODE-test (827 exames, laudo de cardiologistas): F1 dos modelos e de médicos', '',
               para_markdown(tabela_code_test), '',
               '## Tabela 7 — CODE-test: AUC por classe', '', para_markdown(tabela_code_test_auc), '']
+if tabela_ptbxl is not None:
+    texto += ['## Tabela 8 — PTB-XL (Alemanha, 21.799 exames, outro equipamento): validação externa', '',
+              'Limiares os mesmos do CODE-15% (sem reajuste). RBBB/LBBB = códigos CRBBB/CLBBB (bloqueio completo).', '',
+              para_markdown(tabela_ptbxl), '']
 with open(os.path.join(PASTA_TABELAS, 'tabelas.md'), 'w', encoding='utf-8') as f:
     f.write('\n'.join(texto))
 print('\n'.join(texto))
