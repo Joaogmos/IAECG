@@ -126,7 +126,7 @@ if __name__ == '__main__':
             os.replace(raiz, PASTA_PTBXL)
             shutil.rmtree(temporaria, ignore_errors=True)
         if args.so_ptbxl:
-            raise SystemExit("Pronto.")
+            print("Pronto."); raise SystemExit(0)
 
     if not args.so_code_test:
         arquivos = listar_arquivos(REGISTRO_CODE15)
