@@ -329,7 +329,7 @@ class CarregadorLotes:
 def lotes_em_memoria(sinais):
     """Lotes de um array já em memória (inferência / CODE-test)."""
     for i in range(0, len(sinais), TAMANHO_BATCH):
-        yield torch.from_numpy(np.ascontiguousarray(sinais[i:i + TAMANHO_BATCH]))
+        yield torch.from_numpy(np.array(sinais[i:i + TAMANHO_BATCH]))   # cópia: o memmap é só leitura
 
 
 def aumentar_batch(sinais):

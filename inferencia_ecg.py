@@ -46,9 +46,9 @@ DURACAO_MINIMA_S = 7          # o CODE tem exames de 7 e 10 s
 # =============================================================================
 
 def encontrar_melhor_modelo():
-    """O modelo_final.pt v3 com maior AP macro no teste (resultados/v3/*)."""
+    """O modelo_final.pt v3 com maior AP macro no teste (resultados/v3*/*: base inteira ou preliminar)."""
     candidatos = []
-    for caminho in glob(os.path.join(PASTA_RESULTADOS, 'v3', '*', 'modelo_final.pt')):
+    for caminho in glob(os.path.join(PASTA_RESULTADOS, 'v3*', '*', 'modelo_final.pt')):
         info = torch.load(caminho, map_location='cpu', weights_only=False)
         candidatos.append((info['metricas_teste']['ap_macro'], caminho))
     if not candidatos:
