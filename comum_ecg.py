@@ -545,6 +545,24 @@ def treinar_e_avaliar(nome, titulo, modelo, taxa_aprendizado, dados, semente, co
                            historico, melhor_ap, pasta_saida)
 
 
+def salvar_curvas(historico, melhor_epoca, titulo, pasta_saida):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    epocas_executadas = range(1, len(historico['perda_treino']) + 1)
+    ax1.plot(epocas_executadas, historico['perda_treino'], label='Treino',    color='#1565C0')
+    ax1.plot(epocas_executadas, historico['perda_val'],    label='Validação', color='#C62828')
+    ax1.set_title('Curva de Perda (BCE)', fontweight='bold'); ax1.set_ylabel('Perda')
+    ax2.plot(epocas_executadas, historico['ap_val'],  label='AP macro (val)',  color='#C62828')
+    ax2.plot(epocas_executadas, historico['auc_val'], label='AUC macro (val)', color='#2E7D32')
+    ax2.set_title('Métricas de validação', fontweight='bold'); ax2.set_ylabel('Valor')
+    for ax in (ax1, ax2):
+        ax.axvline(melhor_epoca, color='gray', ls='--', lw=1, label='Melhor época')
+        ax.set_xlabel('Época'); ax.legend(); ax.grid(alpha=0.3)
+    plt.suptitle(f'Histórico de Treinamento — {titulo}', fontsize=13, fontweight='bold')
+    plt.tight_layout()
+    plt.savefig(os.path.join(pasta_saida, 'curvas_aprendizado.png'), dpi=200)
+    plt.close(fig)
+
+
 def avaliacao_final(nome, titulo, modelo, taxa_aprendizado, dados, semente, configuracoes,
                     historico, melhor_ap, pasta_saida):
     """
@@ -599,9 +617,9 @@ def avaliacao_final(nome, titulo, modelo, taxa_aprendizado, dados, semente, conf
         'code_test':         code_test,
         'limiares':          limiares,
         'melhor_ap_val':     melhor_ap,
-        'epocas_treinadas':  len(historico['perda_treino']),
-        'melhor_epoca':      int(np.argmax(historico['ap_val'])) + 1,
-        'tempo_medio_epoca_s': float(np.mean(historico['tempo_epoca'])),
+        'epocas_treinadas':  len(historico['perda_treino']) if historico else None,   # None = ensemble
+        'melhor_epoca':      int(np.argmax(historico['ap_val'])) + 1 if historico else None,
+        'tempo_medio_epoca_s': float(np.mean(historico['tempo_epoca'])) if historico else None,
         'tempo_inferencia_ms_por_exame': tempo_inferencia_ms,
         'parametros':        total_parametros,
         'taxa_aprendizado':  taxa_aprendizado,
@@ -634,22 +652,9 @@ def avaliacao_final(nome, titulo, modelo, taxa_aprendizado, dados, semente, conf
     plt.savefig(os.path.join(pasta_saida, 'matrizes_confusao.png'), dpi=200)
     plt.close(fig)
 
-    # ----- Etapa 11: curvas de aprendizado -----
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
-    epocas_executadas = range(1, len(historico['perda_treino']) + 1)
-    ax1.plot(epocas_executadas, historico['perda_treino'], label='Treino',    color='#1565C0')
-    ax1.plot(epocas_executadas, historico['perda_val'],    label='Validação', color='#C62828')
-    ax1.set_title('Curva de Perda (BCE)', fontweight='bold'); ax1.set_ylabel('Perda')
-    ax2.plot(epocas_executadas, historico['ap_val'],  label='AP macro (val)',  color='#C62828')
-    ax2.plot(epocas_executadas, historico['auc_val'], label='AUC macro (val)', color='#2E7D32')
-    ax2.set_title('Métricas de validação', fontweight='bold'); ax2.set_ylabel('Valor')
-    for ax in (ax1, ax2):
-        ax.axvline(metricas['melhor_epoca'], color='gray', ls='--', lw=1, label='Melhor época')
-        ax.set_xlabel('Época'); ax.legend(); ax.grid(alpha=0.3)
-    plt.suptitle(f'Histórico de Treinamento — {titulo}', fontsize=13, fontweight='bold')
-    plt.tight_layout()
-    plt.savefig(os.path.join(pasta_saida, 'curvas_aprendizado.png'), dpi=200)
-    plt.close(fig)
+    # ----- Etapa 11: curvas de aprendizado (o ensemble não tem treino próprio) -----
+    if historico:
+        salvar_curvas(historico, metricas['melhor_epoca'], titulo, pasta_saida)
 
     # ----- Etapa 11b: F1 no CODE-test contra especialistas -----
     if code_test:
@@ -663,7 +668,7 @@ def avaliacao_final(nome, titulo, modelo, taxa_aprendizado, dados, semente, conf
         ax.set_xticklabels([NOMES_COMPLETOS[d] for d in DOENCAS], rotation=15)
         ax.set_ylim(0, 1); ax.set_ylabel('F1-score'); ax.grid(axis='y', alpha=0.3)
         ax.set_title(f'CODE-test (827 exames, laudo de cardiologistas) — {titulo}', fontweight='bold')
-        ax.legend(fontsize=8, loc='lower left')
+        ax.legend(fontsize=9, loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False)
         plt.tight_layout()
         plt.savefig(os.path.join(pasta_saida, 'comparacao_code_test.png'), dpi=200)
         plt.close(fig)

@@ -100,7 +100,8 @@ for m in modelos:
         'Sens. alterado (%)':    media_dp([e['alterado_x_normal_equilibrado']['sensibilidade'] for e in ex]),
         'Sens. alterado triagem (%)': media_dp([e['alterado_x_normal_triagem']['sensibilidade'] for e in ex]),
         'Parâmetros':            f"{ex[0]['parametros']:,}".replace(',', '.'),
-        'Épocas':                f"{np.mean([e['epocas_treinadas'] for e in ex]):.0f}",
+        'Épocas':                (f"{np.mean([e['epocas_treinadas'] for e in ex]):.0f}"
+                                  if ex[0]['epocas_treinadas'] else '-'),   # ensemble não treina
     })
 tabela_comparacao = pd.DataFrame(linhas)
 

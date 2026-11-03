@@ -56,8 +56,25 @@ def encontrar_melhor_modelo():
     return max(candidatos)[1]
 
 
+class Ensemble(torch.nn.Module):
+    """
+    Média das probabilidades de vários modelos (ex.: as 3 sementes da ResNet).
+    Devolve logits (logit da média), então o resto do código trata o ensemble
+    como um modelo qualquer, inclusive na saliência.
+    """
+    def __init__(self, membros):
+        super().__init__()
+        self.membros = torch.nn.ModuleList(membros)
+
+    def forward(self, x):
+        p = torch.stack([torch.sigmoid(m(x).float()) for m in self.membros]).mean(dim=0)
+        return torch.logit(p.clamp(1e-6, 1 - 1e-6))
+
+
 def construir_modelo(nome, configuracoes):
     """Arquitetura vazia a partir do 'nome' salvo no treino."""
+    if nome == 'ensemble':
+        return Ensemble([construir_modelo(m['nome'], m['configuracoes']) for m in configuracoes['membros']])
     if nome == 'cnn1d':
         from cnn1d_ecg import ResNet1DECG
         return ResNet1DECG()

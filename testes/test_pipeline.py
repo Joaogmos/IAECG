@@ -127,3 +127,18 @@ def test_frequencia_cardiaca():
     ritmo = medir_ritmo(sinal)
     assert abs(ritmo['frequencia_bpm'] - 90) < 3
     assert ritmo['irregularidade_rr'] < 0.05
+
+
+def test_ensemble_salva_e_recarrega():
+    import torch
+    from inferencia_ecg import Ensemble, construir_modelo
+    membros = [construir_modelo('cnn1d', {}), construir_modelo('transformer', {'hibrido': True})]
+    configuracoes = {'membros': [{'nome': 'cnn1d', 'configuracoes': {}},
+                                 {'nome': 'transformer', 'configuracoes': {'hibrido': True}}]}
+    ensemble = Ensemble(membros).eval()
+    copia = construir_modelo('ensemble', configuracoes).eval()
+    copia.load_state_dict(ensemble.state_dict())
+    x = torch.randn(2, NUM_AMOSTRAS, 12)
+    with torch.no_grad():
+        media = torch.stack([torch.sigmoid(m(x)) for m in membros]).mean(0)
+        assert torch.allclose(torch.sigmoid(copia(x)), media, atol=1e-5)
