@@ -98,7 +98,7 @@ USA_AMP     = DISPOSITIVO.type == 'cuda'     # bfloat16 na GPU: ~2× mais rápid
 # ETAPA 1 — METADADOS, RÓTULOS E DIVISÃO POR PACIENTE
 # =============================================================================
 
-def carregar_metadados(arquivo_csv, pasta_dados):
+def carregar_metadados(arquivo_csv, pasta_dados, partes=None):
     """
     Lê o exams.csv e mantém só os exames cujo HDF5 está em dados/.
     Acrescenta a posição de cada exame dentro do HDF5 e ordena o DataFrame
@@ -107,6 +107,8 @@ def carregar_metadados(arquivo_csv, pasta_dados):
     df = pd.read_csv(arquivo_csv)
     arquivos = sorted((os.path.basename(p) for p in glob(os.path.join(pasta_dados, 'exams_part*.hdf5'))),
                       key=lambda n: int(n.split('part')[1].split('.')[0]))
+    if partes is not None:                      # ex.: refazer um treino feito com menos partes
+        arquivos = [n for n in arquivos if int(n.split('part')[1].split('.')[0]) in partes]
     print(f"Arquivos HDF5 encontrados ({len(arquivos)}): {arquivos}")
 
     posicoes = []
@@ -189,12 +191,12 @@ def construir_cache(df, arquivo_cache, tamanho_bloco=1000):
     os.replace(temporario, arquivo_cache)
 
 
-def preparar_dados(limite_exames=None):
+def preparar_dados(limite_exames=None, partes=None):
     """
     Retorna dict com o memmap dos sinais, os rótulos (N, 7) e os índices de
     treino/validação/teste. limite_exames: subamostra para testes rápidos.
     """
-    df = carregar_metadados(ARQUIVO_CSV, PASTA_DADOS)
+    df = carregar_metadados(ARQUIVO_CSV, PASTA_DADOS, partes)
     if limite_exames and limite_exames < len(df):
         df = (df.sample(limite_exames, random_state=SEMENTE_DIVISAO)
                 .sort_index().reset_index(drop=True))
@@ -335,7 +337,8 @@ def escolher_limiares(probs, rotulos):
         f1 = 2 * precisao * sensibilidade / np.maximum(precisao + sensibilidade, 1e-12)
         equilibrado.append(float(limiares[np.argmax(f1[:-1])]))
         ok = np.flatnonzero(sensibilidade[:-1] >= SENSIBILIDADE_TRIAGEM)
-        triagem.append(float(limiares[ok[-1]]) if len(ok) else float(limiares[0]))
+        limiar_triagem = float(limiares[ok[-1]]) if len(ok) else float(limiares[0])
+        triagem.append(min(limiar_triagem, equilibrado[-1]))   # nunca menos sensível que o equilibrado
     return {'equilibrado': equilibrado, 'triagem': triagem}
 
 
@@ -432,8 +435,7 @@ def treinar_e_avaliar(nome, titulo, modelo, taxa_aprendizado, dados, semente, co
     sinais, rotulos = dados['sinais'], dados['rotulos']
     carregador_treino    = CarregadorLotes(sinais, dados['treino'], rotulos, embaralhar=True, semente=semente)
     carregador_validacao = CarregadorLotes(sinais, dados['validacao'], rotulos)
-    carregador_teste     = CarregadorLotes(sinais, dados['teste'], rotulos)
-    rotulos_val, rotulos_teste = rotulos[dados['validacao']], rotulos[dados['teste']]
+    rotulos_val = rotulos[dados['validacao']]
 
     # ----- Etapa 6: loss, otimizador e agendador -----
     passos_por_epoca = len(carregador_treino)
@@ -538,9 +540,26 @@ def treinar_e_avaliar(nome, titulo, modelo, taxa_aprendizado, dados, semente, co
             print(f"\n⏹ Early stopping na época {epoca}. Melhor AP de validação: {melhor_ap:.4f}")
             break
 
-    # ----- Etapa 9: limiares na validação, avaliação no teste e no CODE-test -----
-    print("\n=== AVALIAÇÃO FINAL (melhores pesos) ===")
     modelo.load_state_dict(torch.load(arquivo_melhor, map_location=DISPOSITIVO))
+    return avaliacao_final(nome, titulo, modelo, taxa_aprendizado, dados, semente, configuracoes,
+                           historico, melhor_ap, pasta_saida)
+
+
+def avaliacao_final(nome, titulo, modelo, taxa_aprendizado, dados, semente, configuracoes,
+                    historico, melhor_ap, pasta_saida):
+    """
+    Etapas 9 a 12 com os melhores pesos já carregados no modelo. Separada do
+    treino para reavaliar_modelo.py poder refazê-la sem treinar de novo.
+    """
+    print("\n=== AVALIAÇÃO FINAL (melhores pesos) ===")
+    modelo = modelo.to(DISPOSITIVO)
+    total_parametros = sum(p.numel() for p in modelo.parameters() if p.requires_grad)
+    sinais, rotulos = dados['sinais'], dados['rotulos']
+    carregador_validacao = CarregadorLotes(sinais, dados['validacao'], rotulos)
+    carregador_teste     = CarregadorLotes(sinais, dados['teste'], rotulos)
+    rotulos_val, rotulos_teste = rotulos[dados['validacao']], rotulos[dados['teste']]
+
+    # ----- Etapa 9: limiares na validação, avaliação no teste e no CODE-test -----
 
     probs_val = prever(modelo, carregador_validacao)
     limiares  = escolher_limiares(probs_val, rotulos_val)

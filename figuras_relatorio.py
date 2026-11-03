@@ -20,8 +20,22 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch
 
-from comum_ecg import (PASTA_RAIZ, PASTA_DADOS, ARQUIVO_CSV, CLASSES_ORDENADAS,
-                       NOMES_ORDENADOS, NUM_CLASSES, atribuir_classes)
+from comum_ecg import PASTA_RAIZ, PASTA_DADOS, ARQUIVO_CSV, DOENCAS, NOMES_COMPLETOS
+
+# As figuras são do TCC 1 e mostram um exame "puro" de cada classe, então usam
+# a rotulação exclusiva da v2 (Normal = normal_ecg sem nenhuma das 6 doenças).
+CLASSES_ORDENADAS = ['Normal'] + DOENCAS
+NOMES_ORDENADOS   = ['Normal'] + [NOMES_COMPLETOS[d] for d in DOENCAS]
+NUM_CLASSES       = len(CLASSES_ORDENADAS)
+
+
+def atribuir_classes(df):
+    n_doencas = df[DOENCAS].sum(axis=1)
+    classe    = np.full(len(df), -1)
+    classe[(n_doencas == 0) & df['normal_ecg']] = 0
+    for i, doenca in enumerate(DOENCAS, start=1):
+        classe[(n_doencas == 1) & df[doenca]] = i
+    return classe
 
 PASTA_SAIDA = os.path.join(PASTA_RAIZ, 'figuras', 'relatorio')
 os.makedirs(PASTA_SAIDA, exist_ok=True)

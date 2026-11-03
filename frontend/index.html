@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IAECG — apoio à triagem de ECG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <span class="marca-nome">IAECG</span>
+      <span class="marca-desc">Apoio à triagem de ECG de 12 derivações</span>
+    </div>
+    <div class="controle-modo" role="radiogroup" aria-label="Limiar de decisão">
+      <button type="button" role="radio" aria-checked="true" data-modo="equilibrado">Equilibrado</button>
+      <button type="button" role="radio" aria-checked="false" data-modo="triagem">Triagem</button>
+    </div>
+    <p class="modo-ajuda" id="modo-ajuda">Limiar com o melhor equilíbrio entre encontrar doentes e evitar alertas falsos.</p>
+  </header>
+
+  <main class="layout">
+    <aside class="entrada" aria-label="Escolha do exame">
+      <section class="bloco">
+        <h2>Analisar um exame</h2>
+        <label class="soltar" id="soltar" tabindex="0">
+          <input type="file" id="arquivo" multiple accept=".hdf5,.h5,.npy,.csv,.txt,.hea,.dat">
+          <span class="soltar-titulo">Arraste o arquivo do ECG aqui</span>
+          <span class="soltar-sub">ou clique para escolher</span>
+        </label>
+        <p class="formatos">CSV ou TXT com 12 colunas, NPY, HDF5 do CODE ou WFDB (envie o .hea e o .dat juntos).</p>
+        <div class="campos">
+          <label>Frequência de amostragem
+            <span class="campo-unidade"><input type="number" id="frequencia" value="400" min="50" max="5000" step="1"> Hz</span>
+          </label>
+          <label>Exame no HDF5
+            <input type="number" id="indice" value="0" min="0" step="1">
+          </label>
+        </div>
+      </section>
+
+      <section class="bloco">
+        <h2>Exames de demonstração</h2>
+        <p class="nota">Do CODE-test: pacientes que o modelo nunca viu, com laudo de cardiologistas.</p>
+        <ul class="exemplos" id="exemplos"><li class="nota">Carregando…</li></ul>
+      </section>
+    </aside>
+
+    <section class="leitura" aria-live="polite">
+      <div class="vazio" id="vazio">
+        <p class="vazio-titulo">Nenhum exame aberto</p>
+        <p>Envie um arquivo ou escolha um exame de demonstração ao lado.</p>
+      </div>
+
+      <div class="resultado" id="resultado" hidden>
+        <div class="impressao" id="impressao"></div>
+
+        <div class="papel-moldura">
+          <canvas id="papel" aria-label="Traçado do ECG em 12 derivações"></canvas>
+        </div>
+        <div class="saliencia-controle" id="saliencia-controle"></div>
+
+        <div class="painel">
+          <div class="veredito" id="veredito"></div>
+          <div class="saidas">
+            <h3>Probabilidade por saída do modelo</h3>
+            <ul id="saidas"></ul>
+            <p class="nota">A marca vertical é o limiar escolhido na validação. Acima dela, o achado é sinalizado.</p>
+          </div>
+          <div class="qualidade" id="qualidade"></div>
+        </div>
+      </div>
+
+      <p class="erro" id="erro" role="alert" hidden></p>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <p>Ferramenta de pesquisa (TCC, Universidade Presbiteriana Mackenzie). Não é dispositivo médico registrado na ANVISA e não substitui o laudo do cardiologista.
+      O arquivo é analisado em memória e não fica gravado.</p>
+    <p id="modelo-info"></p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

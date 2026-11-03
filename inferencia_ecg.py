@@ -56,18 +56,22 @@ def encontrar_melhor_modelo():
     return max(candidatos)[1]
 
 
+def construir_modelo(nome, configuracoes):
+    """Arquitetura vazia a partir do 'nome' salvo no treino."""
+    if nome == 'cnn1d':
+        from cnn1d_ecg import ResNet1DECG
+        return ResNet1DECG()
+    from transformer_ecg import TransformerECG
+    return TransformerECG(hibrido=configuracoes['hibrido'])
+
+
 def carregar_modelo(caminho=None, dispositivo='cpu'):
     caminho = caminho or os.environ.get('IAECG_MODELO') or encontrar_melhor_modelo()
     info = torch.load(caminho, map_location='cpu', weights_only=False)
     if info.get('protocolo') != 'v3':
         raise ValueError(f"{caminho} é do protocolo v2 (softmax); a inferência usa modelos v3.")
 
-    if info['nome'] == 'cnn1d':
-        from cnn1d_ecg import ResNet1DECG
-        modelo = ResNet1DECG()
-    else:
-        from transformer_ecg import TransformerECG
-        modelo = TransformerECG(hibrido=info['configuracoes']['hibrido'])
+    modelo = construir_modelo(info['nome'], info['configuracoes'])
     modelo.load_state_dict(info['pesos'])
     modelo.to(dispositivo).eval()
     info['caminho'] = caminho
