@@ -15,6 +15,7 @@ const AJUDA_MODO = {
 
 const $ = (id) => document.getElementById(id);
 const pct = (v) => (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+const pct0 = (v) => Math.round(v * 100) + '%';
 const num = (v, casas = 0) => v.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
 
 // ---------------------------------------------------------------------------
@@ -121,6 +122,8 @@ function marcarExemplo(indice) {
 async function carregarInfoModelo() {
   try {
     const info = await chamar('/api/modelo');
+    estado.desempenho = info.desempenho_por_classe || null;
+    if (estado.resultado) mostrarSaidas(estado.resultado);
     const ct = info.metricas_code_test;
     $('modelo-info').textContent = `Modelo: ${info.arquitetura} · protocolo ${info.protocolo}`
       + ` · teste interno: AUC ${num(info.metricas_teste.auc_macro, 3)}, F1 ${num(info.metricas_teste.f1_macro, 3)}`
@@ -189,7 +192,14 @@ function mostrarVeredito(r) {
 }
 
 function mostrarSaidas(r) {
-  $('saidas').innerHTML = r.resultados.map((s) => `
+  $('saidas').innerHTML = r.resultados.map((s) => {
+    // Desempenho desta classe no teste interno (prevalência real), no modo escolhido
+    const d = estado.desempenho && estado.desempenho[s.sigla] && estado.desempenho[s.sigla][r.modo];
+    const desempenho = d
+      ? `<span class="saida-desempenho">no teste: encontra ${pct0(d.sensibilidade)} dos casos · `
+        + `${pct0(d.precisao)} dos alertas confirmados</span>`
+      : '';
+    return `
     <li class="saida ${s.positivo ? 'positivo' : ''} ${s.sigla === 'Normal' ? 'normal' : ''}">
       <span class="saida-nome">${s.nome}</span>
       <span class="barra" role="img" aria-label="${s.nome}: ${pct(s.probabilidade)}, limiar ${pct(s.limiar)}">
@@ -197,7 +207,9 @@ function mostrarSaidas(r) {
         <span class="barra-limiar" style="left:calc(${(s.limiar * 100).toFixed(1)}% - 1px)"></span>
       </span>
       <span class="saida-pct">${pct(s.probabilidade)}</span>
-    </li>`).join('');
+      ${desempenho}
+    </li>`;
+  }).join('');
 }
 
 function mostrarQualidade(r) {

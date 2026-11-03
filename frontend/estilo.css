@@ -190,6 +190,7 @@ button, input { font: inherit; color: inherit; }
 .saida.normal.positivo .barra-valor { background: var(--normal); }
 .barra-limiar { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--tinta); }
 .saida-pct { font-family: var(--f-dados); font-size: 13px; text-align: right; }
+.saida-desempenho { grid-column: 2 / -1; margin-top: -4px; font-size: 12px; color: var(--tinta-suave); }
 
 .qualidade ul { margin: 0; padding-left: 18px; }
 .qualidade li { margin-bottom: 6px; }

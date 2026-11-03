@@ -35,7 +35,9 @@ Os exames de demonstração vêm do CODE-test (`python baixar_dados.py --so-code
 ## Contrato da API
 
 `GET /api/modelo` devolve arquitetura, protocolo, saídas, limiares (`equilibrado` e `triagem`),
-métricas do teste interno e do CODE-test.
+métricas do teste interno, do CODE-test e do PTB-XL, e `desempenho_por_classe`
+(`{sigla: {modo: {sensibilidade, especificidade, precisao}}}`, do teste interno), que a interface
+mostra embaixo de cada barra.
 
 `GET /api/exemplos` devolve `[{indice, idade, sexo, laudo: ['RBBB'], laudo_nomes: [...]}]`.
 

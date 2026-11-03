@@ -765,6 +765,10 @@ def avaliacao_final(nome, titulo, modelo, taxa_aprendizado, dados, semente, conf
         'metricas_teste': {k: metricas[k] for k in ['auc_macro', 'ap_macro', 'f1_macro']},
         'metricas_code_test': code_test['resumo'] if code_test else None,
         'metricas_ptbxl':     ptbxl['resumo'] if ptbxl else None,
+        # o que a interface mostra ao lado de cada saída (teste interno = prevalência real)
+        'desempenho_por_classe': {s: {modo: {k: c[modo][k] for k in ('sensibilidade', 'especificidade', 'precisao')}
+                                      for modo in ('equilibrado', 'triagem')}
+                                  for s, c in por_classe_teste.items()},
     }, os.path.join(pasta_saida, 'modelo_final.pt'))
 
     print(f"\nArquivos gerados em: {pasta_saida}")

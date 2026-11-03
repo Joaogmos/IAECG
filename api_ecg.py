@@ -16,10 +16,8 @@
 import os
 import argparse
 
-import numpy as np
 import pandas as pd
 import h5py
-import torch
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
 
@@ -66,6 +64,8 @@ def obter_modelo():
         'limiares': info['limiares'],
         'metricas_teste': info['metricas_teste'],
         'metricas_code_test': info.get('metricas_code_test'),
+        'metricas_ptbxl': info.get('metricas_ptbxl'),
+        'desempenho_por_classe': info.get('desempenho_por_classe'),
         'formatos': ['.hdf5 (formato CODE)', '.npy', '.csv / .txt (12 colunas)', 'WFDB (.hea + .dat)'],
     }
 
