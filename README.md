@@ -1,78 +1,91 @@
-# ECG Transformer: Classificação Multiclasse de Arritmias Cardíacas
+# IAECG: classificação de alterações em ECG de 12 derivações
 
-Este repositório contém o código-fonte, a documentação e o artigo de investigação do projeto **ECG Transformer**, desenvolvido como Trabalho de Conclusão de Curso (TCC) e para a disciplina de Inteligência Artificial da Universidade Presbiteriana Mackenzie.
+Código do Trabalho de Conclusão de Curso da Universidade Presbiteriana Mackenzie (FCI). O projeto treina
+redes neurais que leem o ECG de 12 derivações e apontam seis alterações: bloqueio AV de 1º grau (1dAVb),
+bloqueio de ramo direito (RBBB) e esquerdo (LBBB), bradicardia sinusal (SB), taquicardia sinusal (ST) e
+fibrilação atrial (AF). No TCC 2 o modelo ganhou uma API e uma interface web para apoio à triagem.
 
 ## Integrantes
 * Enzo Ponte Gamberi - RA: 10389931
 * João Guilherme Messias de Oliveira Santos - RA: 10426110
-* Thiago Ruiz Fernandes Silva – RA: 10426057
+* Thiago Ruiz Fernandes Silva - RA: 10426057
 * André Ihsan Ward - RA: 10425684
 
-## Sobre o Projeto
-As doenças cardiovasculares são uma das principais causas de mortalidade no mundo. O Eletrocardiograma (ECG) é o exame padrão para o diagnóstico destas patologias, mas a sua interpretação depende de médicos especialistas, frequentemente escassos em sistemas de telessaúde.
+Orientador: Prof. Dr. Gustavo Scalabrini Sampaio.
 
-Este projeto propõe uma abordagem inovadora utilizando **Deep Learning**. Como modelo principal, implementamos um modelo baseado no mecanismo de atenção **Vision Transformer (ViT)**, adaptado para o processamento de sinais unidimensionais (1D), comparado com uma CNN 1D (ResNet) como baseline. Os modelos classificam exames de ECG em 7 categorias clínicas:
-1. Normal
-2. Bloqueio AV de 1º Grau (1dAVb)
-3. Bloqueio de Ramo Direito (RBBB)
-4. Bloqueio de Ramo Esquerdo (LBBB)
-5. Bradicardia Sinusal (SB)
-6. Taquicardia Sinusal (ST)
-7. Fibrilação Atrial (AF)
-
-## Dataset: CODE (Telehealth Network of Minas Gerais)
-Os dados utilizados neste projeto pertencem ao dataset CODE, uma base de dados em larga escala contendo exames de ECG reais oriundos da rede de telessaúde de Minas Gerais. 
-
-* **Formato dos Dados:** Os sinais brutos (12 derivações) estão armazenados em ficheiros `.hdf5`, e os metadados e os rótulos de diagnóstico encontram-se no ficheiro `exams.csv`.
-* **Pré-processamento:** O pipeline realiza a extração dos sinais, normalização z-score por derivação, balanceamento (até 2.000 exames por classe) e divisão 70/15/15 **por paciente**, para que nenhum paciente apareça em mais de um conjunto.
-* *Nota:* Devido ao limite de armazenamento do GitHub, os ficheiros `.hdf5` originais não estão no repositório.
-
-## Datasets
-* CODE-15% (https://zenodo.org/records/4916206): treino e validação.
-* CODE-test (https://zenodo.org/records/3765780): teste anotado por cardiologistas.
+## Dados
+* CODE-15% (https://zenodo.org/records/4916206): 345.779 exames de 233.770 pacientes, usado para treino, validação e teste interno.
+* CODE-test (https://zenodo.org/records/3765780): 827 exames de outros pacientes, laudados por cardiologistas. É o teste externo.
 * CODE-II (https://arxiv.org/abs/2511.15632): referência.
 
-Baixe do Drive do grupo e coloque `exams.csv` e os `.hdf5` em `dados/` (pasta ignorada pelo Git).
+`python baixar_dados.py` baixa o que faltar direto do Zenodo para `dados/` (pasta fora do Git), confere o MD5 e
+retoma downloads interrompidos. São cerca de 70 GB descompactados. Quem já tem parte dos `.hdf5` (Drive do grupo)
+pode copiá-los antes para `dados/`, e o script baixa só o resto.
+
+## Protocolos
+
+**v2 (TCC 1, na branch `main`).** Subconjunto balanceado de 13.613 exames, 7 classes exclusivas (softmax) e
+divisão por paciente. Resultado no teste, com 3 sementes: CNN 93,4 ± 0,4% de acurácia (F1 0,933), Transformer
+híbrido 89,6 ± 0,6% e Transformer 87,9 ± 0,8%.
+
+**v3 (TCC 2, branch `tcc2`).** Feito para ficar perto do uso real:
+* usa todos os exames do CODE-15% com a prevalência natural (cerca de 2% por doença), sem balancear e sem descartar
+  exames com outras alterações;
+* é multirrótulo: 6 sigmoides para as doenças e uma 7ª para "ECG normal". Um exame pode ter duas doenças, e um
+  exame sem nenhuma das seis pode ter outra alteração;
+* divide 70/15/15 por paciente, estratificando pela doença mais rara de cada exame;
+* escolhe dois limiares por classe na validação: "equilibrado" (F1 máximo, como em Ribeiro et al., 2020) e
+  "triagem" (sensibilidade de pelo menos 95%);
+* seleciona a época pela AP macro de validação (área sob a curva precisão-sensibilidade, que não depende de limiar);
+* avalia no teste interno e no CODE-test, onde compara o F1 com residentes de cardiologia, residentes de
+  emergência, estudantes de medicina e a DNN de Ribeiro et al. (2020).
+
+No CODE-test as derivações aumentadas estão gravadas como aVL, aVF, aVR, e não aVR, aVL, aVF como no CODE-15%.
+Conferimos pela lei de Einthoven (aVR = -(DI+DII)/2) e o código reordena na leitura.
 
 ## Modelos
-### Transformer (`transformer_ecg.py`, principal)
-O modelo `TransformerECG` foi construído do zero utilizando **PyTorch**. O fluxo de processamento consiste em:
-1. **Patch Embedding:** Divisão do sinal 1D de 4096 amostras em *patches* menores usando convoluções.
-2. **Positional Embedding & CLS Token:** Injeção da informação espacial/temporal no sinal.
-3. **Transformer Encoder:** 4 camadas com 4 cabeças de atenção (*Multi-Head Attention*) para captar dependências globais e de longo alcance no batimento cardíaco.
-4. **Classification Head:** Camada linear final que converte a representação para os logits das 7 classes.
+* `cnn1d_ecg.py`: ResNet 1D de Ribeiro et al. (2020), 6,8 M de parâmetros. Melhor modelo no TCC 1.
+* `transformer_ecg.py`: Transformer 1D com patches de 64 amostras (160 ms), token CLS, 4 camadas e 4 cabeças.
+  Com `--hibrido`, 3 convoluções geram tokens de 40 ms antes da atenção.
 
-Variante híbrida (`python transformer_ecg.py --hibrido`): 3 convoluções extraem a morfologia local (tokens de 40 ms) antes das camadas de atenção.
+Treino, dados e avaliação ficam em `comum_ecg.py`, iguais para todos os modelos.
 
-### ResNet 1D (`cnn1d_ecg.py`, baseline)
-Baseado em Ribeiro et al. (2020). Resultados atualizados em `docs/tabelas/tabelas.md` e gráficos em `figuras/cnn1d/`.
+## Inferência, API e interface
+* `inferencia_ecg.py` lê `.hdf5` (formato CODE), `.npy`, `.csv`/`.txt` com 12 colunas e WFDB (`.hea` + `.dat`).
+  Reordena as derivações pelo nome, reamostra para 400 Hz, confere a ordem das aumentadas por Einthoven, avisa
+  sobre derivação solta, saturação e registro curto, mede FC e irregularidade do RR e calcula a saliência
+  (onde no traçado o modelo se apoiou).
+* `api_ecg.py` (FastAPI) serve o modelo em `/api` e a interface de `frontend/` em `/`. O exame é processado em
+  memória e não fica gravado. O contrato da API está em `frontend/README.md`.
 
-## Resultados (conjunto de teste, média ± desvio de 3 sementes)
-| Modelo | Acurácia | F1 macro | AUC macro | Parâmetros |
-|---|---|---|---|---|
-| Transformer 1D | 87,9 ± 0,8% | 87,7 ± 0,8% | 0,983 | 0,9 M |
-| Transformer híbrido | 89,6 ± 0,6% | 89,5 ± 0,6% | 0,986 | 1,1 M |
-| CNN 1D ResNet | 93,4 ± 0,4% | 93,3 ± 0,4% | 0,989 | 6,8 M |
+A ferramenta é de pesquisa. Não é dispositivo médico registrado na ANVISA e não substitui o laudo do cardiologista.
 
-## Organização do Repositório
-* `comum_ecg.py`: dados, divisão por paciente, treino e avaliação (compartilhado pelos dois modelos).
-* `transformer_ecg.py`, `cnn1d_ecg.py`: arquiteturas e scripts de treino.
-* `gerar_tabelas.py`: tabelas de resultados (Markdown/CSV) e figuras para o pôster.
-* `figuras_relatorio.py`: figuras de ECG, distribuição das classes e fluxo do projeto.
-* `dados/`: dados locais (fora do Git). `resultados/`: saídas de treino (fora do Git).
-* `figuras/`: gráficos finais para pôster e relatório.
-* `docs/`: guias da equipe, registro de experimentos, relatório e pôster.
-* `CLAUDE.md`: contexto do projeto para o Claude Code.
-
-## Como Executar
+## Como executar
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
 pip install torch --index-url https://download.pytorch.org/whl/cu128   # GPU NVIDIA
 pip install -r requirements.txt
-python cnn1d_ecg.py          # baseline
-python transformer_ecg.py    # modelo principal
-python gerar_tabelas.py      # tabelas em docs/tabelas/tabelas.md
-python figuras_relatorio.py  # figuras em figuras/relatorio/
+
+python baixar_dados.py                  # CODE-15% e CODE-test em dados/
+python treinar_todos.py                 # 3 modelos × 3 sementes (v3); retoma se parar
+python gerar_tabelas.py                 # docs/tabelas/v3/tabelas.md e figuras/v3/
+python api_ecg.py                       # interface em http://127.0.0.1:8000
+python -m pytest testes                 # testes do pipeline e da inferência
 ```
-Para repetir com outra semente: `python transformer_ecg.py --semente 7`.
+
+Um treino isolado: `python cnn1d_ecg.py --semente 7`. Teste rápido do pipeline com poucos exames:
+`python cnn1d_ecg.py --limite 6000` (sai em `resultados/teste_rapido/`). Para refazer só a avaliação de um treino
+pronto: `python reavaliar_modelo.py resultados/v3/cnn1d_s42`. Na linha de comando:
+`python inferencia_ecg.py exame.csv --frequencia 500`.
+
+Na base inteira o cache de sinais (`dados/cache_sinais_v3_*.npy`, float16) ocupa cerca de 34 GB e é lido por
+memmap, então não precisa caber na RAM. Numa RTX 4060, cada época da ResNet leva uns 5 minutos.
+
+## Organização
+* `comum_ecg.py`: rótulos, divisão por paciente, cache, augmentation, treino, limiares, métricas e figuras.
+* `cnn1d_ecg.py`, `transformer_ecg.py`: arquiteturas.
+* `inferencia_ecg.py`, `api_ecg.py`, `frontend/`: uso do modelo fora do treino.
+* `baixar_dados.py`, `treinar_todos.py`, `reavaliar_modelo.py`, `gerar_tabelas.py`, `figuras_relatorio.py`: utilitários.
+* `testes/`: testes com sinais sintéticos (não precisam dos dados).
+* `dados/`, `resultados/`, `docs/`: fora do Git. `figuras/`: gráficos finais, versionados.

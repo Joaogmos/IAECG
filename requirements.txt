@@ -1,7 +1,16 @@
-torch
-numpy
-pandas
-h5py
-matplotlib
-seaborn
-scikit-learn
+# torch vem do índice da NVIDIA (ver README); a versão testada é a 2.11.0+cu128
+torch>=2.11
+numpy==2.5.4
+pandas==3.0.6
+h5py==3.16.0
+scipy==1.18.1
+scikit-learn==1.9.1
+matplotlib==3.11.2
+seaborn==0.13.2
+# inferência, API e interface
+fastapi==0.162.0
+uvicorn==0.54.0
+python-multipart==0.0.33
+wfdb==4.3.1
+# testes
+pytest==9.2.0
