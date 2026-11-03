@@ -78,8 +78,8 @@ def construir_modelo(nome, configuracoes):
     if nome == 'cnn1d':
         from cnn1d_ecg import ResNet1DECG
         return ResNet1DECG()
-    from transformer_ecg import TransformerECG
-    return TransformerECG(hibrido=configuracoes['hibrido'])
+    from transformer_ecg import modelo_das_configuracoes
+    return modelo_das_configuracoes(configuracoes)
 
 
 def carregar_modelo(caminho=None, dispositivo='cpu'):
