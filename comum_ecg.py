@@ -84,6 +84,7 @@ NUM_DERIVACOES = 12
 TAMANHO_BATCH    = 64
 EPOCAS           = 40     # com ~240 mil exames de treino, cada época já vê muitos dados
 PACIENCIA        = 8
+REDUCAO_LR       = 3      # LR ÷ 10 a cada 3 épocas sem melhora (2 reduções antes de parar)
 MIN_EPOCAS       = 10
 SEMENTE_DIVISAO  = 42     # fixa: todos os modelos (e todas as sementes) usam o mesmo split
 SENSIBILIDADE_TRIAGEM = 0.95                 # alvo do limiar "triagem", escolhido na validação
@@ -440,17 +441,17 @@ def treinar_e_avaliar(nome, titulo, modelo, taxa_aprendizado, dados, semente, co
     # ----- Etapa 6: loss, otimizador e agendador -----
     passos_por_epoca = len(carregador_treino)
     passos_warmup    = max(50, min(200, passos_por_epoca // 2))
-    total_passos     = EPOCAS * passos_por_epoca
 
     funcao_perda = nn.BCEWithLogitsLoss()
     otimizador   = torch.optim.AdamW(modelo.parameters(), lr=taxa_aprendizado, weight_decay=1e-3)
 
+    # Warmup linear e depois LR ÷ 10 a cada REDUCAO_LR épocas sem melhora (como em
+    # Ribeiro et al., 2020). Com a base inteira o early stopping chega cedo, e um
+    # cosseno longo pararia com a LR ainda alta.
+    escala = {'lr': 1.0}
+
     def calcular_taxa_aprendizado(passo_atual):
-        """Warmup linear + decaimento cosseno proporcional ao treino real."""
-        if passo_atual < passos_warmup:
-            return passo_atual / max(1, passos_warmup)
-        progresso = (passo_atual - passos_warmup) / max(1, total_passos - passos_warmup)
-        return max(0.05, 0.5 * (1 + math.cos(math.pi * progresso)))
+        return min(1.0, passo_atual / max(1, passos_warmup)) * escala['lr']
 
     agendador = torch.optim.lr_scheduler.LambdaLR(otimizador, calcular_taxa_aprendizado)
 
@@ -468,6 +469,7 @@ def treinar_e_avaliar(nome, titulo, modelo, taxa_aprendizado, dados, semente, co
             epoca_inicial      = estado['epoca'] + 1
             melhor_ap          = estado['melhor_ap']
             contador_paciencia = estado['contador_paciencia']
+            escala['lr']       = estado.get('escala_lr', 1.0)
             print(f"Retomando da época {epoca_inicial} | Melhor AP val: {melhor_ap:.4f}")
         else:
             print("Checkpoint é de outro conjunto de dados — ignorando e começando do zero.")
@@ -478,6 +480,7 @@ def treinar_e_avaliar(nome, titulo, modelo, taxa_aprendizado, dados, semente, co
             'modelo': modelo.state_dict(), 'otimizador': otimizador.state_dict(),
             'agendador': agendador.state_dict(), 'melhor_ap': melhor_ap,
             'contador_paciencia': contador_paciencia, 'historico': historico,
+            'escala_lr': escala['lr'],
         }, arquivo_checkpoint)
 
     # ----- Etapa 8: loop de treino -----
@@ -527,6 +530,10 @@ def treinar_e_avaliar(nome, titulo, modelo, taxa_aprendizado, dados, semente, co
             torch.save(modelo.state_dict(), arquivo_melhor)
         else:
             contador_paciencia += 1
+            if contador_paciencia % REDUCAO_LR == 0:
+                escala['lr'] *= 0.1
+                for grupo in otimizador.param_groups:          # aplica já (o LambdaLR segue a escala)
+                    grupo['lr'] = taxa_aprendizado * calcular_taxa_aprendizado(agendador.last_epoch)
 
         print(f"Época {epoca:03d} | Perda tr: {perda_tr:.4f} | Perda val: {historico['perda_val'][-1]:.4f} "
               f"AP val: {resumo_val['ap_macro']:.4f} AUC val: {resumo_val['auc_macro']:.4f} "

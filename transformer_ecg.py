@@ -132,6 +132,8 @@ if __name__ == '__main__':
     parser.add_argument('--semente', type=int, default=42)
     parser.add_argument('--limite', type=int, default=None,
                         help='usa só N exames (teste rápido do pipeline)')
+    parser.add_argument('--partes', type=int, nargs='*', default=None,
+                        help='só estas partes do CODE-15%% (padrão: todas em dados/)')
     parser.add_argument('--hibrido', action='store_true',
                         help='usa 3 convoluções antes da atenção (tokens de 40 ms)')
     args = parser.parse_args()
@@ -139,7 +141,7 @@ if __name__ == '__main__':
     torch.manual_seed(args.semente)
     np.random.seed(args.semente)
 
-    dados = preparar_dados(args.limite)
+    dados = preparar_dados(args.limite, args.partes)
     treinar_e_avaliar(
         nome='transformer_hibrido' if args.hibrido else 'transformer',
         titulo='Transformer híbrido (Conv + Transformer)' if args.hibrido else 'Transformer 1D',

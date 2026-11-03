@@ -130,13 +130,15 @@ if __name__ == '__main__':
     parser.add_argument('--semente', type=int, default=42)
     parser.add_argument('--limite', type=int, default=None,
                         help='usa só N exames (teste rápido do pipeline)')
+    parser.add_argument('--partes', type=int, nargs='*', default=None,
+                        help='só estas partes do CODE-15%% (padrão: todas em dados/)')
     args = parser.parse_args()
 
     torch.manual_seed(args.semente)
     np.random.seed(args.semente)
     torch.backends.cudnn.benchmark = True        # entrada de tamanho fixo → cuDNN escolhe a conv mais rápida
 
-    dados = preparar_dados(args.limite)
+    dados = preparar_dados(args.limite, args.partes)
     treinar_e_avaliar(
         nome='cnn1d', titulo='CNN 1D (ResNet)',
         modelo=ResNet1DECG(), taxa_aprendizado=TAXA_APRENDIZADO,
