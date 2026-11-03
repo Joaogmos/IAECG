@@ -175,21 +175,30 @@ def construir_cache(df, arquivo_cache, tamanho_bloco=1000):
     ~34 GB para o CODE-15% inteiro). O arquivo é lido por memmap no treino,
     então não precisa caber na RAM. Grava em .tmp e renomeia no fim, para
     um cache incompleto nunca ser usado.
+
+    A escrita é sequencial, com write() comum: escrever por memmap deixava as
+    páginas modificadas na RAM e, com 34 GB, esgotava a memória do Windows.
+    Dá para escrever em ordem porque o df já vem na ordem dos HDF5.
     """
+    assert (df.index.to_numpy() == np.arange(len(df))).all()
     temporario = arquivo_cache + '.tmp'
-    cache = np.lib.format.open_memmap(temporario, mode='w+', dtype=np.float16,
-                                      shape=(len(df), NUM_AMOSTRAS, NUM_DERIVACOES))
-    for nome_arquivo, grupo in df.groupby('trace_file', sort=False):
-        print(f"  Lendo {nome_arquivo} ({len(grupo):,} exames)...", flush=True)
-        linhas   = grupo.index.to_numpy()
-        posicoes = grupo['posicao_hdf5'].to_numpy()
-        with h5py.File(os.path.join(PASTA_DADOS, nome_arquivo), 'r') as f:
-            for inicio in range(0, len(posicoes), tamanho_bloco):
-                p = posicoes[inicio:inicio + tamanho_bloco]
-                bloco = f['tracings'][p.min():p.max() + 1]      # leitura contínua, rápida
-                cache[linhas[inicio:inicio + tamanho_bloco]] = normalizar_sinais(bloco[p - p.min()])
-    cache.flush()
-    del cache
+    with open(temporario, 'wb') as saida:
+        np.lib.format.write_array_header_1_0(saida, {
+            'descr': np.lib.format.dtype_to_descr(np.dtype(np.float16)), 'fortran_order': False,
+            'shape': (len(df), NUM_AMOSTRAS, NUM_DERIVACOES)})
+        escritos = 0
+        for nome_arquivo, grupo in df.groupby('trace_file', sort=False):
+            print(f"  Lendo {nome_arquivo} ({len(grupo):,} exames)...", flush=True)
+            assert grupo.index[0] == escritos and (np.diff(grupo.index) == 1).all()
+            posicoes = grupo['posicao_hdf5'].to_numpy()
+            with h5py.File(os.path.join(PASTA_DADOS, nome_arquivo), 'r') as f:
+                for inicio in range(0, len(posicoes), tamanho_bloco):
+                    p = posicoes[inicio:inicio + tamanho_bloco]
+                    bloco = f['tracings'][p.min():p.max() + 1]      # leitura contínua, rápida
+                    saida.write(normalizar_sinais(bloco[p - p.min()]).astype(np.float16).tobytes())
+            escritos += len(grupo)
+            saida.flush()
+            os.fsync(saida.fileno())                 # não acumula páginas sujas no cache do sistema
     os.replace(temporario, arquivo_cache)
 
 
