@@ -16,6 +16,8 @@ Orientador: Prof. Dr. Gustavo Scalabrini Sampaio.
 ## Dados
 * CODE-15% (https://zenodo.org/records/4916206): 345.779 exames de 233.770 pacientes, usado para treino, validação e teste interno.
 * CODE-test (https://zenodo.org/records/3765780): 827 exames de outros pacientes, laudados por cardiologistas. É o teste externo.
+* PTB-XL (https://physionet.org/content/ptb-xl/1.0.3/): 21.799 ECGs da Alemanha, outro equipamento e outra
+  população. Segundo teste externo (`python baixar_dados.py --so-ptbxl`).
 * CODE-II (https://arxiv.org/abs/2511.15632): referência.
 
 `python baixar_dados.py` baixa o que faltar direto do Zenodo para `dados/` (pasta fora do Git), confere o MD5 e
@@ -37,8 +39,9 @@ híbrido 89,6 ± 0,6% e Transformer 87,9 ± 0,8%.
 * escolhe dois limiares por classe na validação: "equilibrado" (F1 máximo, como em Ribeiro et al., 2020) e
   "triagem" (sensibilidade de pelo menos 95%);
 * seleciona a época pela AP macro de validação (área sob a curva precisão-sensibilidade, que não depende de limiar);
-* avalia no teste interno e no CODE-test, onde compara o F1 com residentes de cardiologia, residentes de
-  emergência, estudantes de medicina e a DNN de Ribeiro et al. (2020).
+* avalia no teste interno, no CODE-test (onde compara o F1 com residentes de cardiologia, residentes de
+  emergência, estudantes de medicina e a DNN de Ribeiro et al., 2020) e no PTB-XL;
+* mede a calibração (ECE), porque a interface mostra a probabilidade ao médico.
 
 No CODE-test as derivações aumentadas estão gravadas como aVL, aVF, aVR, e não aVR, aVL, aVF como no CODE-15%.
 Conferimos pela lei de Einthoven (aVR = -(DI+DII)/2) e o código reordena na leitura.
@@ -74,7 +77,8 @@ python api_ecg.py                       # interface em http://127.0.0.1:8000
 python -m pytest testes                 # testes do pipeline e da inferência
 ```
 
-Um treino isolado: `python cnn1d_ecg.py --semente 7`. Teste rápido do pipeline com poucos exames:
+Um treino isolado: `python cnn1d_ecg.py --semente 7`. Ensemble das sementes: `python ensemble_ecg.py cnn1d`.
+Busca de hiperparâmetros do Transformer (48 combinações num subconjunto): `python busca_transformer.py`. Teste rápido do pipeline com poucos exames:
 `python cnn1d_ecg.py --limite 6000` (sai em `resultados/teste_rapido/`). Para refazer só a avaliação de um treino
 pronto: `python reavaliar_modelo.py resultados/v3/cnn1d_s42`. Na linha de comando:
 `python inferencia_ecg.py exame.csv --frequencia 500`.
@@ -86,6 +90,7 @@ memmap, então não precisa caber na RAM. Numa RTX 4060, cada época da ResNet l
 * `comum_ecg.py`: rótulos, divisão por paciente, cache, augmentation, treino, limiares, métricas e figuras.
 * `cnn1d_ecg.py`, `transformer_ecg.py`: arquiteturas.
 * `inferencia_ecg.py`, `api_ecg.py`, `frontend/`: uso do modelo fora do treino.
-* `baixar_dados.py`, `treinar_todos.py`, `reavaliar_modelo.py`, `gerar_tabelas.py`, `figuras_relatorio.py`: utilitários.
+* `baixar_dados.py`, `treinar_todos.py`, `ensemble_ecg.py`, `busca_transformer.py`, `reavaliar_modelo.py`,
+  `gerar_tabelas.py`, `figuras_relatorio.py`: utilitários.
 * `testes/`: testes com sinais sintéticos (não precisam dos dados).
 * `dados/`, `resultados/`, `docs/`: fora do Git. `figuras/`: gráficos finais, versionados.
