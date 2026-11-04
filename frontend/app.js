@@ -7,6 +7,8 @@ const estado = {
   resultado: null,
   salienciaAtiva: null,      // sigla cuja saliência está desenhada
   lote: null,                // {arquivos, resposta} da última fila
+  origem: '',                // nome do arquivo analisado (vai no impresso)
+  versao: '',                // versão do modelo, de /api/modelo
 };
 
 const AJUDA_MODO = {
@@ -48,6 +50,8 @@ function analisarArquivos(arquivos, indice = null) {
   if (!arquivos.length) return;
   marcarExemplo(null);
   $('voltar-fila').hidden = indice === null;
+  const nomes = [...new Set(arquivos.map((a) => a.name.replace(/\.(hea|dat)$/i, '')))].join(', ');
+  estado.origem = indice ? `${nomes} (exame ${indice})` : nomes;
   analisar(() => {
     const dados = new FormData();
     for (const arquivo of arquivos) dados.append('arquivos', arquivo);
@@ -61,6 +65,7 @@ function analisarArquivos(arquivos, indice = null) {
 function analisarExemplo(indice) {
   marcarExemplo(indice);
   $('voltar-fila').hidden = true;
+  estado.origem = `CODE-test, exame ${indice}`;
   analisar(() => chamar(`/api/exemplos/${indice}?modo=${estado.modo}`));
 }
 
@@ -221,6 +226,8 @@ async function carregarInfoModelo() {
   try {
     const info = await chamar('/api/modelo');
     estado.desempenho = info.desempenho_por_classe || null;
+    estado.versao = `${info.arquitetura} · ${info.versao || 'protocolo ' + info.protocolo}`;
+    if (estado.resultado) mostrarCabecalho(estado.resultado);
     if (estado.resultado) mostrarSaidas(estado.resultado);
     const ct = info.metricas_code_test;
     $('modelo-info').textContent = `Modelo: ${info.arquitetura} · protocolo ${info.protocolo}`
@@ -254,12 +261,24 @@ function mostrarResultado(r) {
   $('fila').hidden = true;
   $('resultado').hidden = false;
 
+  mostrarCabecalho(r);
   mostrarImpressao(r);
   mostrarVeredito(r);
   mostrarSaidas(r);
   mostrarQualidade(r);
   mostrarControleSaliencia(r);
   desenharPapel(true);
+}
+
+function mostrarCabecalho(r) {
+  // só aparece no papel impresso (@media print)
+  const agora = new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  const modo = r.modo === 'triagem' ? 'triagem' : 'equilibrado';
+  $('cabecalho-impressao').innerHTML =
+    `<b>IAECG · apoio à leitura de ECG</b>`
+    + `<span>Arquivo: ${escapar(estado.origem || '—')}</span>`
+    + `<span>Analisado em ${agora} · modo ${modo}</span>`
+    + `<span>Modelo: ${escapar(estado.versao || r.modelo.arquitetura)}</span>`;
 }
 
 function mostrarImpressao(r) {

@@ -16,6 +16,7 @@
 
 import os
 import argparse
+from datetime import datetime
 
 import pandas as pd
 import h5py
@@ -34,6 +35,9 @@ EXEMPLOS_POR_CLASSE = 4
 DISPOSITIVO = os.environ.get('IAECG_DISPOSITIVO', 'cpu')   # CPU: é o cenário de uso real
 modelo, info = carregar_modelo(dispositivo=DISPOSITIVO)
 print(f"Modelo carregado: {info['arquitetura']} ({info['caminho']}) em {DISPOSITIVO}")
+# versão = pasta do treino (ex.: cnn1d_s42) + data do arquivo; vai no laudo impresso
+VERSAO_MODELO = (os.path.basename(os.path.dirname(os.path.abspath(info['caminho'])))
+                 + ' de ' + datetime.fromtimestamp(os.path.getmtime(info['caminho'])).strftime('%d/%m/%Y'))
 
 app = FastAPI(title='IAECG', description='Apoio à triagem de ECG de 12 derivações (pesquisa — TCC Mackenzie)')
 
@@ -63,7 +67,7 @@ EXEMPLOS, ARQUIVO_CODE_TEST = montar_exemplos()
 @app.get('/api/modelo')
 def obter_modelo():
     return {
-        'arquitetura': info['arquitetura'], 'protocolo': info['protocolo'],
+        'arquitetura': info['arquitetura'], 'protocolo': info['protocolo'], 'versao': VERSAO_MODELO,
         'saidas': [{'sigla': s, 'nome': NOMES_COMPLETOS[s]} for s in info['saidas']],
         'limiares': info['limiares'],
         'metricas_teste': info['metricas_teste'],

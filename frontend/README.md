@@ -34,7 +34,7 @@ Os exames de demonstração vêm do CODE-test (`python baixar_dados.py --so-code
 
 ## Contrato da API
 
-`GET /api/modelo` devolve arquitetura, protocolo, saídas, limiares (`equilibrado` e `triagem`),
+`GET /api/modelo` devolve arquitetura, protocolo, `versao` (pasta do treino e data, ex.: `cnn1d_s42 de 04/11/2026`), saídas, limiares (`equilibrado` e `triagem`),
 métricas do teste interno, do CODE-test e do PTB-XL, e `desempenho_por_classe`
 (`{sigla: {modo: {sensibilidade, especificidade, precisao}}}`, do teste interno), que a interface
 mostra embaixo de cada barra.
@@ -81,7 +81,7 @@ Erros vêm com status 4xx e `{"detail": "mensagem em português"}`, que a interf
 
 - Tela de "como ler o resultado" para o médico (o que é limiar, o que é o modo triagem).
 - Zoom e rolagem no papel; régua para medir intervalos (PR, QRS) clicando em dois pontos.
-- O botão "Imprimir ou salvar em PDF" usa o `@media print` de `estilo.css` (só o exame, o veredito e o aviso).
-  Falta: cabeçalho com data, nome do arquivo e versão do modelo no impresso.
+- O botão "Imprimir ou salvar em PDF" usa o `@media print` de `estilo.css`: só o exame, o veredito e o aviso,
+  com um cabeçalho (arquivo, data e hora, modo, versão do modelo) que só aparece no papel.
 - Modo escuro, que hoje não existe: o papel de ECG claro foi escolhido de propósito, mas o resto da tela pode escurecer.
 - Testar com leitor de tela; as barras de probabilidade já têm `aria-label`.

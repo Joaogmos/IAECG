@@ -271,6 +271,9 @@ button, input { font: inherit; color: inherit; }
   * { transition: none !important; }
 }
 
+/* cabeçalho do laudo impresso (arquivo, data, modelo); escondido na tela */
+.cabecalho-impressao { display: none; }
+
 /* ----- impressão: só o exame, o veredito e o aviso ----- */
 @media print {
   body { background: #fff; font-size: 12px; }
@@ -280,5 +283,10 @@ button, input { font: inherit; color: inherit; }
   .painel { grid-template-columns: 1fr 1fr; break-inside: avoid; }
   .painel > div, .papel-moldura { border-color: #999; }
   .rodape { padding: 8px 0 0; color: #000; }
+  .cabecalho-impressao {
+    display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 0 0 6px; margin-bottom: 6px;
+    border-bottom: 1px solid #999; font-family: var(--f-dados); font-size: 11px;
+  }
+  .cabecalho-impressao b { flex-basis: 100%; font-size: 13px; }
   * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
