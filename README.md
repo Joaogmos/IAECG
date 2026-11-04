@@ -62,6 +62,9 @@ Treino, dados e avaliação ficam em `comum_ecg.py`, iguais para todos os modelo
 * `api_ecg.py` (FastAPI) serve o modelo em `/api` e a interface de `frontend/` em `/`. O exame é processado em
   memória e não fica gravado. O contrato da API está em `frontend/README.md`.
 
+Para rodar em outro computador sem instalar Python, há um `Dockerfile` (CPU). O modelo fica fora da imagem:
+`docker build -t iaecg .` e `docker run -p 8000:8000 -v "%cd%/resultados/v3/cnn1d_s42:/modelo" iaecg`.
+
 A ferramenta é de pesquisa. Não é dispositivo médico registrado na ANVISA e não substitui o laudo do cardiologista.
 
 ## Como executar
