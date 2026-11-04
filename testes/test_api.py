@@ -66,3 +66,18 @@ def test_exemplos_do_code_test():
     r = cliente.get(f"/api/exemplos/{exemplos[0]['indice']}").json()
     assert r['exemplo']['indice'] == exemplos[0]['indice']
     assert cliente.get('/api/exemplos/99999').status_code == 404
+
+
+def test_triagem_em_lote(tmp_path):
+    from triagem_lote import listar_exames, triar, gravar
+    from inferencia_ecg import carregar_modelo
+    np.save(tmp_path / 'bom.npy', ecg_sintetico(fs=400))
+    np.save(tmp_path / 'curto.npy', ecg_sintetico(fs=400)[:800])   # 2 s: tem que pedir repetição
+    (tmp_path / 'quebrado.csv').write_bytes(b'1,2,3\n')
+    modelo, info = carregar_modelo()
+    linhas = triar(listar_exames([str(tmp_path)]), modelo, info, 400, 'equilibrado')
+    vereditos = {l['exame']: l['veredito'] for l in linhas}
+    assert vereditos['curto.npy'] == 'repetir' and vereditos['quebrado.csv'] == 'erro'
+    assert linhas[0]['exame'] == 'curto.npy' and linhas[-1]['exame'] == 'quebrado.csv'
+    gravar(linhas, tmp_path / 'fila.csv')
+    assert (tmp_path / 'fila.csv').read_text(encoding='utf-8-sig').startswith('posicao;exame')

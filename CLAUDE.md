@@ -15,6 +15,7 @@ Projeto: IA que lê ECG de 12 derivações e aponta 6 alterações (1dAVb, RBBB,
 - `cnn1d_ecg.py`: ResNet 1D (Ribeiro et al. 2020). Melhor modelo; é o do produto.
 - `inferencia_ecg.py`: leitura de formatos (hdf5/npy/csv/WFDB), reamostragem, Einthoven,
   qualidade, FC/RR, saliência. `api_ecg.py` (FastAPI) serve isso e `frontend/`.
+  `triagem_lote.py`: pasta ou HDF5 inteiro → fila em CSV (repetir, alterado, outra, normal).
 - `baixar_dados.py`, `treinar_todos.py`, `reavaliar_modelo.py`, `gerar_tabelas.py`, `figuras_relatorio.py`.
 - `testes/`: pytest com sinais sintéticos.
 Os scripts de modelo só definem a arquitetura e a LR; mudanças de treino vão em `comum_ecg.py`

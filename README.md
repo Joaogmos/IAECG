@@ -81,7 +81,10 @@ Um treino isolado: `python cnn1d_ecg.py --semente 7`. Ensemble das sementes: `py
 Busca de hiperparâmetros do Transformer (48 combinações num subconjunto): `python busca_transformer.py`. Teste rápido do pipeline com poucos exames:
 `python cnn1d_ecg.py --limite 6000` (sai em `resultados/teste_rapido/`). Para refazer só a avaliação de um treino
 pronto: `python reavaliar_modelo.py resultados/v3/cnn1d_s42`. Na linha de comando:
-`python inferencia_ecg.py exame.csv --frequencia 500`.
+`python inferencia_ecg.py exame.csv --frequencia 500`. Para uma fila de laudos,
+`python triagem_lote.py pasta_de_exames/ --saida fila.csv` analisa todos os arquivos da pasta (ou todos os
+exames de um HDF5) e grava um CSV com os de sinal ruim primeiro (repetir), depois os alterados pela maior
+probabilidade, os de outra alteração e os normais. O CODE-test inteiro (827 exames) leva uns 12 s na CPU.
 
 Na base inteira o cache de sinais (`dados/cache_sinais_v3_*.npy`, float16) ocupa cerca de 34 GB e é lido por
 memmap, então não precisa caber na RAM. Numa RTX 4060, cada época da ResNet leva uns 5 minutos.
@@ -89,7 +92,7 @@ memmap, então não precisa caber na RAM. Numa RTX 4060, cada época da ResNet l
 ## Organização
 * `comum_ecg.py`: rótulos, divisão por paciente, cache, augmentation, treino, limiares, métricas e figuras.
 * `cnn1d_ecg.py`, `transformer_ecg.py`: arquiteturas.
-* `inferencia_ecg.py`, `api_ecg.py`, `frontend/`: uso do modelo fora do treino.
+* `inferencia_ecg.py`, `api_ecg.py`, `frontend/`, `triagem_lote.py`: uso do modelo fora do treino.
 * `baixar_dados.py`, `treinar_todos.py`, `ensemble_ecg.py`, `busca_transformer.py`, `reavaliar_modelo.py`,
   `gerar_tabelas.py`, `figuras_relatorio.py`: utilitários.
 * `testes/`: testes com sinais sintéticos (não precisam dos dados).

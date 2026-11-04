@@ -290,10 +290,11 @@ def saliencia(modelo, x, saida, janela=40):
     return mapa / (mapa.max() + 1e-12)
 
 
-def analisar(sinal, frequencia, modelo, info, modo='equilibrado', fator_reducao=2):
+def analisar(sinal, frequencia, modelo, info, modo='equilibrado', fator_reducao=2, com_saliencia=True):
     """
     sinal: (amostras, 12) em qualquer frequência. Devolve um dict pronto para JSON.
     fator_reducao: decima o traçado devolvido para o gráfico (400 Hz → 200 Hz).
+    com_saliencia=False pula o gradiente (triagem em lote, onde só as probabilidades importam).
     """
     sinal, duracao_s = ajustar_para_modelo(orientar(sinal), frequencia)
     sinal, alerta_ordem = corrigir_aumentadas(sinal)
@@ -323,7 +324,7 @@ def analisar(sinal, frequencia, modelo, info, modo='equilibrado', fator_reducao=
         veredito = 'outra_alteracao'     # nenhuma das 6, mas também não parece normal
 
     mapas = {}
-    for r in (achados or [max((r for r in resultados if r['sigla'] in DOENCAS),
+    for r in [] if not com_saliencia else (achados or [max((r for r in resultados if r['sigla'] in DOENCAS),
                               key=lambda r: r['probabilidade'])]):
         mapas[r['sigla']] = saliencia(modelo, x, saidas.index(r['sigla']))[::fator_reducao].round(3).tolist()
 
