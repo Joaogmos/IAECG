@@ -212,6 +212,45 @@ button, input { font: inherit; color: inherit; }
 
 .carregando { opacity: 0.55; transition: opacity 0.2s; }
 
+/* ----- fila de vários exames ----- */
+.botao-lote, .botao, .voltar-fila {
+  display: inline-flex; align-items: center; position: relative; cursor: pointer;
+  padding: 7px 14px; border: 1px solid var(--tinta); border-radius: var(--raio);
+  background: var(--superficie); font-weight: 500; font-size: 14px;
+}
+.botao-lote:hover, .botao:hover, .voltar-fila:hover { background: var(--papel); }
+.botao-lote input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.voltar-fila { border-color: var(--linha); margin-bottom: 10px; }
+
+.fila {
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio); padding: 16px;
+}
+.fila-topo { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.fila-contagem { margin: 0 0 12px; font-family: var(--f-dados); font-size: 13px; color: var(--tinta-suave); }
+.fila-rolagem { max-height: 68vh; overflow: auto; border: 1px solid var(--linha); border-radius: var(--raio); }
+.fila-tabela { width: 100%; border-collapse: collapse; font-size: 14px; }
+.fila-tabela th {
+  position: sticky; top: 0; background: var(--fundo); text-align: left;
+  font: 600 13px var(--f-titulo); letter-spacing: 0.02em; padding: 8px 10px; border-bottom: 1px solid var(--linha);
+}
+.fila-tabela td { padding: 7px 10px; border-bottom: 1px solid var(--linha); vertical-align: top; }
+.fila-tabela .num { text-align: right; font-family: var(--f-dados); font-size: 13px; white-space: nowrap; }
+.fila-tabela tbody tr[tabindex="0"] { cursor: pointer; }
+.fila-tabela tbody tr[tabindex="0"]:hover { background: var(--papel); }
+.fila-exame { font-family: var(--f-dados); font-size: 13px; word-break: break-all; }
+.fila-obs { font-size: 12px; color: var(--tinta-suave); max-width: 320px; }
+
+/* Selo do veredito: cor + texto, nunca só a cor */
+.selo {
+  display: inline-block; padding: 1px 8px; border-radius: 10px; white-space: nowrap;
+  font-size: 12px; font-weight: 600; border: 1px solid currentColor;
+}
+.selo[data-veredito="alterado"]        { color: var(--alterado); }
+.selo[data-veredito="normal"]          { color: var(--normal); }
+.selo[data-veredito="outra_alteracao"] { color: var(--outra); }
+.selo[data-veredito="repetir"]         { color: var(--outra); border-style: dashed; }
+.selo[data-veredito="erro"]            { color: var(--tinta-suave); }
+
 /* ----- telas menores ----- */
 @media (max-width: 980px) {
   .layout { grid-template-columns: 1fr; padding: 16px; }

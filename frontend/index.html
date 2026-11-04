@@ -43,6 +43,16 @@
       </section>
 
       <section class="bloco">
+        <h2>Fila de vários exames</h2>
+        <label class="botao-lote" tabindex="0">
+          <input type="file" id="arquivo-lote" multiple accept=".hdf5,.h5,.npy,.csv,.txt,.hea,.dat">
+          Escolher vários arquivos
+        </label>
+        <p class="nota">Até 2.000 exames. Monta a ordem de leitura: repetir, alterados, outra alteração, normais.
+          Um HDF5 entra com todos os exames dele.</p>
+      </section>
+
+      <section class="bloco">
         <h2>Exames de demonstração</h2>
         <p class="nota">Do CODE-test: pacientes que o modelo nunca viu, com laudo de cardiologistas.</p>
         <ul class="exemplos" id="exemplos"><li class="nota">Carregando…</li></ul>
@@ -55,7 +65,27 @@
         <p>Envie um arquivo ou escolha um exame de demonstração ao lado.</p>
       </div>
 
+      <div class="fila" id="fila" hidden>
+        <div class="fila-topo">
+          <div>
+            <h2>Fila de leitura</h2>
+            <p class="fila-contagem" id="fila-contagem"></p>
+          </div>
+          <button type="button" class="botao" id="baixar-fila">Baixar CSV</button>
+        </div>
+        <div class="fila-rolagem">
+          <table class="fila-tabela">
+            <thead><tr><th scope="col">Nº</th><th scope="col">Exame</th><th scope="col">Leitura</th>
+              <th scope="col">Achados</th><th scope="col" class="num">Maior prob.</th><th scope="col" class="num">FC</th>
+              <th scope="col">Observação</th></tr></thead>
+            <tbody id="fila-linhas"></tbody>
+          </table>
+        </div>
+        <p class="nota">Clique numa linha para abrir o traçado. A ordem é só uma sugestão de prioridade: todos os exames precisam do laudo do cardiologista.</p>
+      </div>
+
       <div class="resultado" id="resultado" hidden>
+        <button type="button" class="voltar-fila" id="voltar-fila" hidden>← Voltar para a fila</button>
         <div class="impressao" id="impressao"></div>
 
         <div class="papel-moldura">

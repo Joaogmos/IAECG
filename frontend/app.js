@@ -6,6 +6,7 @@ const estado = {
   ultimaAnalise: null,       // função que refaz a última análise (ao trocar o modo)
   resultado: null,
   salienciaAtiva: null,      // sigla cuja saliência está desenhada
+  lote: null,                // {arquivos, resposta} da última fila
 };
 
 const AJUDA_MODO = {
@@ -43,14 +44,15 @@ async function analisar(executar) {
   }
 }
 
-function analisarArquivos(arquivos) {
+function analisarArquivos(arquivos, indice = null) {
   if (!arquivos.length) return;
   marcarExemplo(null);
+  $('voltar-fila').hidden = indice === null;
   analisar(() => {
     const dados = new FormData();
     for (const arquivo of arquivos) dados.append('arquivos', arquivo);
     dados.append('frequencia', $('frequencia').value || '400');
-    dados.append('indice', $('indice').value || '0');
+    dados.append('indice', String(indice ?? ($('indice').value || '0')));
     dados.append('modo', estado.modo);
     return chamar('/api/analisar', { method: 'POST', body: dados });
   });
@@ -58,7 +60,96 @@ function analisarArquivos(arquivos) {
 
 function analisarExemplo(indice) {
   marcarExemplo(indice);
+  $('voltar-fila').hidden = true;
   analisar(() => chamar(`/api/exemplos/${indice}?modo=${estado.modo}`));
+}
+
+// ---------------------------------------------------------------------------
+// Fila de vários exames (POST /api/lote)
+// ---------------------------------------------------------------------------
+
+const VEREDITO_CURTO = {
+  repetir: 'Repetir exame', alterado: 'Alterado', outra_alteracao: 'Outra alteração',
+  normal: 'Normal', erro: 'Arquivo ilegível',
+};
+
+async function analisarLote(arquivos) {
+  if (!arquivos.length) return;
+  estado.ultimaAnalise = () => analisarLote(arquivos);
+  $('erro').hidden = true;
+  const leitura = document.querySelector('.leitura');
+  leitura.classList.add('carregando');
+  try {
+    const dados = new FormData();
+    for (const arquivo of arquivos) dados.append('arquivos', arquivo);
+    dados.append('frequencia', $('frequencia').value || '400');
+    dados.append('modo', estado.modo);
+    estado.lote = { arquivos: [...arquivos], resposta: await chamar('/api/lote', { method: 'POST', body: dados }) };
+    mostrarFila();
+  } catch (erro) {
+    $('erro').textContent = erro.message;
+    $('erro').hidden = false;
+  } finally {
+    leitura.classList.remove('carregando');
+  }
+}
+
+function mostrarFila() {
+  const { resposta } = estado.lote;
+  $('vazio').hidden = true;
+  $('resultado').hidden = true;
+  $('fila').hidden = false;
+  marcarExemplo(null);
+  estado.ultimaAnalise = () => analisarLote(estado.lote.arquivos);
+
+  const c = resposta.contagem;
+  $('fila-contagem').textContent = `${num(resposta.total)} exames · modo ${resposta.modo} · `
+    + ['repetir', 'alterado', 'outra_alteracao', 'normal', 'erro']
+      .filter((v) => c[v]).map((v) => `${num(c[v])} ${VEREDITO_CURTO[v].toLowerCase()}`).join(' · ');
+
+  const corpo = $('fila-linhas');
+  corpo.innerHTML = resposta.fila.map((l) => `
+    <tr tabindex="${l.veredito === 'erro' ? -1 : 0}" data-exame="${escapar(l.exame)}" data-veredito="${l.veredito}">
+      <td class="num">${l.posicao}</td>
+      <td class="fila-exame">${escapar(l.exame)}</td>
+      <td><span class="selo" data-veredito="${l.veredito}">${VEREDITO_CURTO[l.veredito] || l.veredito}</span></td>
+      <td>${escapar(l.achados || '')}</td>
+      <td class="num">${l.maior_prob !== undefined ? pct(l.maior_prob) : ''}</td>
+      <td class="num">${l.fc_bpm ? num(l.fc_bpm) : ''}</td>
+      <td class="fila-obs">${escapar(l.observacao || '')}</td>
+    </tr>`).join('');
+  corpo.querySelectorAll('tr[tabindex="0"]').forEach((linha) => {
+    const abrir = () => abrirDaFila(linha.dataset.exame);
+    linha.addEventListener('click', abrir);
+    linha.addEventListener('keydown', (e) => { if (e.key === 'Enter') abrir(); });
+  });
+}
+
+function abrirDaFila(exame) {
+  // "arquivo.hdf5#12" → o HDF5 no índice 12; WFDB → o .hea e o .dat de mesmo nome
+  const [nome, indice] = exame.split('#');
+  const base = (n) => n.replace(/\.[^.]+$/, '');
+  const arquivos = estado.lote.arquivos.filter((a) =>
+    a.name === nome || (/\.(hea|dat)$/i.test(a.name) && base(a.name) === nome));
+  analisarArquivos(arquivos, indice === undefined ? 0 : Number(indice));
+}
+
+function baixarFila() {
+  const { fila } = estado.lote.resposta;
+  // Mesmas colunas e ordem do CSV de triagem_lote.py
+  const probs = [...new Set(fila.flatMap((l) => Object.keys(l).filter((k) => k.startsWith('p_'))))];
+  const colunas = ['posicao', 'exame', 'veredito', 'achados', 'maior_prob', ...probs, 'fc_bpm', 'observacao'];
+  const celula = (v) => (v === undefined ? '' : String(v).replace(/;/g, ','));
+  const texto = [colunas.join(';'), ...fila.map((l) => colunas.map((c) => celula(l[c])).join(';'))].join('\n');
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob(['﻿' + texto], { type: 'text/csv;charset=utf-8' }));
+  link.download = 'fila_triagem.csv';
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function escapar(texto) {
+  return String(texto).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +159,12 @@ function analisarExemplo(indice) {
 function configurarEntrada() {
   const zona = $('soltar');
   $('arquivo').addEventListener('change', (e) => analisarArquivos(e.target.files));
+  $('arquivo-lote').addEventListener('change', (e) => analisarLote(e.target.files));
+  document.querySelector('.botao-lote').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('arquivo-lote').click(); }
+  });
+  $('baixar-fila').addEventListener('click', baixarFila);
+  $('voltar-fila').addEventListener('click', () => { estado.ultimaAnalise = null; mostrarFila(); });
   zona.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('arquivo').click(); }
   });
@@ -153,6 +250,7 @@ const VEREDITOS = {
 function mostrarResultado(r) {
   estado.resultado = r;
   $('vazio').hidden = true;
+  $('fila').hidden = true;
   $('resultado').hidden = false;
 
   mostrarImpressao(r);
@@ -271,7 +369,8 @@ function desenharPapel(animar) {
   if (!r) return;
   const canvas = $('papel');
   const largura = canvas.clientWidth;
-  const mm = largura / (MM_CALIBRACAO + SEGUNDOS * 25);
+  if (!largura) return;                    // escondido (fila aberta): grade de passo 0 nunca terminaria
+  const mm =largura / (MM_CALIBRACAO + SEGUNDOS * 25);
   const altura = Math.round(mm * (MM_LINHA * 4 + 6));
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(largura * dpr);

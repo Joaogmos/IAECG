@@ -17,9 +17,9 @@ Os exames de demonstração vêm do CODE-test (`python baixar_dados.py --so-code
 
 | Arquivo | O que tem |
 |---|---|
-| `index.html` | estrutura: topo (modo), coluna de entrada (arquivo + exemplos), leitura (papel + painéis), rodapé |
+| `index.html` | estrutura: topo (modo), coluna de entrada (arquivo, fila de vários exames, exemplos), leitura (fila ou papel + painéis), rodapé |
 | `estilo.css` | tokens de cor e tipo em `:root`; layout em grid; quebra para 1 coluna abaixo de 980 px |
-| `app.js` | chamadas à API, desenho do papel de ECG em `<canvas>`, painéis de resultado |
+| `app.js` | chamadas à API, fila de leitura (tabela, abrir exame, baixar CSV), desenho do papel de ECG em `<canvas>`, painéis de resultado |
 
 ## Identidade visual
 
