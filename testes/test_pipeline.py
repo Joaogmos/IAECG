@@ -151,3 +151,18 @@ def test_erro_calibracao():
     calibrado = (gerador.random(20000) < p).astype(float)       # y ~ Bernoulli(p)
     assert erro_calibracao(calibrado, p) < 0.02
     assert erro_calibracao(calibrado, p ** 3) > 0.1             # probabilidades distorcidas
+
+
+def test_defeitos_do_tracado():
+    import torch
+    from comum_ecg import defeitos_do_tracado, normalizar_sinais
+    torch.manual_seed(0)
+    x = np.stack([np.pad(ecg_sintetico(fs=400, semente=i), ((0, 96), (0, 0))) for i in range(32)])
+    x = torch.from_numpy(normalizar_sinais(x))
+    y = defeitos_do_tracado(x, prob=1.0)
+    assert y.shape == x.shape and torch.isfinite(y).all()
+    assert (y[:, 4000:].std(dim=1) < 1e-5).all()                # depois de 10 s o registro foi cortado
+    zeradas = (y.abs().sum(dim=1) == 0).sum(dim=1)
+    assert ((zeradas >= 1) & (zeradas <= 3)).all()             # 1 a 3 eletrodos soltos
+    vivas = y.abs().sum(dim=1) > 0
+    assert torch.allclose(y.std(dim=1)[vivas], torch.ones(()), atol=1e-3)   # z-score refeito

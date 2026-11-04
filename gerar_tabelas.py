@@ -30,9 +30,9 @@ PASTA_FIGURAS = os.path.join(PASTA_RAIZ, 'figuras', PROTOCOLO)
 PASTA_TABELAS = os.path.join(PASTA_RAIZ, 'docs', 'tabelas', PROTOCOLO)
 os.makedirs(PASTA_TABELAS, exist_ok=True)
 os.makedirs(PASTA_FIGURAS, exist_ok=True)
-ORDEM_MODELOS  = ['transformer', 'transformer_hibrido', 'cnn1d']
-CORES          = {'transformer': '#90CAF9', 'transformer_hibrido': '#1565C0', 'cnn1d': '#C62828'}
-ROTULOS_CURTOS = {'transformer': 'Transf.', 'transformer_hibrido': 'Híbrido', 'cnn1d': 'CNN'}
+ORDEM_MODELOS  = ['transformer', 'transformer_hibrido', 'cnn1d', 'cnn1d_robusto']
+CORES          = {'transformer': '#90CAF9', 'transformer_hibrido': '#1565C0', 'cnn1d': '#C62828', 'cnn1d_robusto': '#7B1F1F'}
+ROTULOS_CURTOS = {'transformer': 'Transf.', 'transformer_hibrido': 'Híbrido', 'cnn1d': 'CNN', 'cnn1d_robusto': 'CNN rob.'}
 CORES_LEITORES = {'DNN Ribeiro et al. (2020)': '#424242', 'Residentes de cardiologia': '#8D6E63',
                   'Residentes de emergência': '#BCAAA4', 'Estudantes de medicina': '#D7CCC8'}
 

@@ -132,6 +132,8 @@ if __name__ == '__main__':
                         help='usa só N exames (teste rápido do pipeline)')
     parser.add_argument('--partes', type=int, nargs='*', default=None,
                         help='só estas partes do CODE-15%% (padrão: todas em dados/)')
+    parser.add_argument('--robusto', action='store_true',
+                        help='augmentation com linha de base, ruído forte, eletrodo solto e corte (v3.1)')
     args = parser.parse_args()
 
     torch.manual_seed(args.semente)
@@ -140,7 +142,8 @@ if __name__ == '__main__':
 
     dados = preparar_dados(args.limite, args.partes)
     treinar_e_avaliar(
-        nome='cnn1d', titulo='CNN 1D (ResNet)',
+        nome='cnn1d_robusto' if args.robusto else 'cnn1d',
+        titulo='CNN 1D (ResNet, aug. robusto)' if args.robusto else 'CNN 1D (ResNet)',
         modelo=ResNet1DECG(), taxa_aprendizado=TAXA_APRENDIZADO,
         dados=dados, semente=args.semente,
         configuracoes={
@@ -150,4 +153,5 @@ if __name__ == '__main__':
             'filtros':        FILTROS,
             'comprimentos':   COMPRIMENTOS,
             'dropout':        DROPOUT,
+            'aumento_robusto': args.robusto,
         })

@@ -341,7 +341,7 @@ def lotes_em_memoria(sinais):
         yield torch.from_numpy(np.array(sinais[i:i + TAMANHO_BATCH]))   # cópia: o memmap é só leitura
 
 
-def aumentar_batch(sinais):
+def aumentar_batch(sinais, robusto=False):
     """
     Augmentation aplicado direto na GPU, por exame:
       - ruído gaussiano leve (σ = 0.02)
@@ -351,10 +351,49 @@ def aumentar_batch(sinais):
     justamente o que diferencia bloqueio de ramo direito de esquerdo.
     """
     b = sinais.size(0)
+    if robusto:
+        sinais = defeitos_do_tracado(sinais)
     sinais = sinais + torch.randn_like(sinais) * 0.02
     sinais = sinais * (0.9 + 0.2 * torch.rand(b, 1, 1, device=sinais.device))
     deslocamento = int(torch.randint(-200, 201, (1,)))
     return torch.roll(sinais, shifts=deslocamento, dims=1)
+
+
+def defeitos_do_tracado(sinais, prob=0.5):
+    """
+    Augmentation "robusto" (v3.1, opcional): cada exame recebe, com probabilidade
+    prob cada, os defeitos que mais derrubaram o modelo em robustez_ecg.py:
+      - oscilação de linha de base (0,15–0,5 Hz, até 2 desvios-padrão);
+      - ruído branco forte (σ de 0,05 a 0,5, SNR de ~26 a 6 dB);
+      - 1 a 3 derivações zeradas (eletrodo solto);
+      - registro cortado entre 7 e 10 s (zera o fim, como o CODE completa).
+    Depois refaz o z-score com os zeros, igual a normalizar_sinais na inferência,
+    para o modelo ver a mesma escala que veria num exame com esses defeitos.
+    """
+    b, n, d = sinais.shape
+    disp = sinais.device
+    sorteio = lambda: (torch.rand(b, 1, 1, device=disp) < prob).float()
+
+    t = torch.arange(n, device=disp).view(1, n, 1) / FREQUENCIA_HZ
+    f = 0.15 + 0.35 * torch.rand(b, 1, d, device=disp)
+    fase = 2 * np.pi * torch.rand(b, 1, d, device=disp)
+    amplitude = 2 * torch.rand(b, 1, 1, device=disp)
+    sinais = sinais + sorteio() * amplitude * torch.sin(2 * np.pi * f * t + fase)
+
+    sigma = 0.05 + 0.45 * torch.rand(b, 1, 1, device=disp)
+    sinais = sinais + sorteio() * sigma * torch.randn_like(sinais)
+
+    quantas = torch.randint(1, 4, (b, 1, 1), device=disp)
+    ordem = torch.rand(b, 1, d, device=disp).argsort(dim=2).argsort(dim=2)   # posto aleatório por exame
+    soltas = (ordem < quantas).float() * sorteio()
+    sinais = sinais * (1 - soltas)
+
+    duracao = (7 + 3 * torch.rand(b, 1, 1, device=disp)) * FREQUENCIA_HZ
+    sinais = sinais * (1 - sorteio() * (t * FREQUENCIA_HZ >= duracao).float())
+
+    media = sinais.mean(dim=1, keepdim=True)
+    desvio = sinais.std(dim=1, keepdim=True)
+    return (sinais - media) / (desvio + 1e-8)
 
 
 @torch.no_grad()
@@ -556,7 +595,8 @@ def treinar_e_avaliar(nome, titulo, modelo, taxa_aprendizado, dados, semente, co
         modelo.train()
         perda_total, aviso = 0.0, max(1, passos_por_epoca // 5)
         for passo, (x, y) in enumerate(carregador_treino, start=1):
-            x = aumentar_batch(x.to(DISPOSITIVO, non_blocking=True).float())
+            x = aumentar_batch(x.to(DISPOSITIVO, non_blocking=True).float(),
+                               robusto=configuracoes.get('aumento_robusto', False))
             y = y.to(DISPOSITIVO, non_blocking=True)
             with torch.autocast(DISPOSITIVO.type, dtype=torch.bfloat16, enabled=USA_AMP):
                 logits = modelo(x)

@@ -75,7 +75,7 @@ def construir_modelo(nome, configuracoes):
     """Arquitetura vazia a partir do 'nome' salvo no treino."""
     if nome == 'ensemble':
         return Ensemble([construir_modelo(m['nome'], m['configuracoes']) for m in configuracoes['membros']])
-    if nome == 'cnn1d':
+    if nome.startswith('cnn1d'):
         from cnn1d_ecg import ResNet1DECG
         return ResNet1DECG()
     from transformer_ecg import modelo_das_configuracoes
