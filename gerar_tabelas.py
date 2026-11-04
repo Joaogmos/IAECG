@@ -150,6 +150,25 @@ if all(e.get('ptbxl') for e in execucoes):
     ], axis=1)
     tabela_ptbxl.insert(1, 'Positivos', [ref['ptbxl']['por_classe'][s]['suporte'] for s in SAIDAS])
 
+# ----- Tabela 9: robustez no CODE-test (robustez_ecg.py), F1 macro por defeito -----
+tabela_robustez = None
+colunas_rob = {}
+for arquivo in sorted(glob(os.path.join(PASTA_RESULTADOS, PROTOCOLO, '*', 'robustez*.json'))):
+    pasta = os.path.dirname(arquivo)
+    if not os.path.exists(os.path.join(pasta, 'metricas.json')):
+        continue
+    with open(os.path.join(pasta, 'metricas.json'), encoding='utf-8') as f:
+        rotulo = f"{json.load(f)['modelo']} ({os.path.basename(pasta)})"
+    with open(arquivo, encoding='utf-8') as f:
+        rob = json.load(f)
+    rotulo += ' + passa-alta' if rob.get('filtro') else ''
+    colunas_rob[rotulo] = {(r['grupo'], r['condicao']): r['metricas']['f1_macro'] for r in rob['resultados']}
+if colunas_rob:
+    condicoes = list(next(iter(colunas_rob.values())))
+    tabela_robustez = pd.DataFrame([{'Defeito': g, 'Nível': c,
+                                     **{k: f"{v[(g, c)] * 100:.1f}" for k, v in colunas_rob.items()}}
+                                    for g, c in condicoes])
+
 # ----- Salvar -----
 tabelas = [('tabela_dataset.csv', tabela_dataset), ('tabela_comparacao.csv', tabela_comparacao),
            ('tabela_auc_por_classe.csv', tabela_auc), ('tabela_f1_por_classe.csv', tabela_f1),
@@ -158,6 +177,8 @@ if tabela_code_test is not None:
     tabelas += [('tabela_code_test_f1.csv', tabela_code_test), ('tabela_code_test_auc.csv', tabela_code_test_auc)]
 if tabela_ptbxl is not None:
     tabelas += [('tabela_ptbxl.csv', tabela_ptbxl)]
+if tabela_robustez is not None:
+    tabelas += [('tabela_robustez.csv', tabela_robustez)]
 for nome_arquivo, tabela in tabelas:
     tabela.to_csv(os.path.join(PASTA_TABELAS, nome_arquivo), index=False, encoding='utf-8-sig')
 
@@ -185,6 +206,11 @@ if tabela_ptbxl is not None:
     texto += ['## Tabela 8 — PTB-XL (Alemanha, 21.799 exames, outro equipamento): validação externa', '',
               'Limiares os mesmos do CODE-15% (sem reajuste). RBBB/LBBB = códigos CRBBB/CLBBB (bloqueio completo).', '',
               para_markdown(tabela_ptbxl), '']
+if tabela_robustez is not None:
+    texto += ['## Tabela 9 — Robustez no CODE-test: F1 macro (%) com defeitos comuns do traçado', '',
+              'Defeitos aplicados em mV, semente fixa, limiares da validação (robustez_ecg.py). '
+              '"+ passa-alta": com o filtro de 0,5 Hz que a inferência aplica.', '',
+              para_markdown(tabela_robustez), '']
 with open(os.path.join(PASTA_TABELAS, 'tabelas.md'), 'w', encoding='utf-8') as f:
     f.write('\n'.join(texto))
 print('\n'.join(texto))
