@@ -5,6 +5,7 @@
 #   GET  /api/exemplos         exames do CODE-test para demonstração (com laudo)
 #   GET  /api/exemplos/{i}     analisa o exame i do CODE-test
 #   POST /api/analisar         analisa um arquivo enviado (multipart)
+#   POST /api/lote             vários exames de uma vez -> fila de triagem (JSON ou CSV)
 #   GET  /                     interface (arquivos de frontend/)
 #
 # Nenhum exame enviado é gravado em disco: tudo é processado em memória.
@@ -19,12 +20,15 @@ import argparse
 import pandas as pd
 import h5py
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from comum_ecg import PASTA_RAIZ, PASTA_CODE_TEST, DOENCAS, NOMES_COMPLETOS, ORDEM_CODE_TEST
 from inferencia_ecg import carregar_modelo, ler_arquivos, analisar
+from triagem_lote import agrupar_exames, triar, para_csv
 
 TAMANHO_MAXIMO_MB = 50
+MAXIMO_EXAMES_LOTE = 2000        # ~30 s na CPU
 EXEMPLOS_POR_CLASSE = 4
 
 DISPOSITIVO = os.environ.get('IAECG_DISPOSITIVO', 'cpu')   # CPU: é o cenário de uso real
@@ -105,6 +109,42 @@ async def analisar_arquivo(arquivos: list[UploadFile] = File(...),
         return analisar(sinal, freq, modelo, info, validar_modo(modo))
     except (ValueError, KeyError, OSError) as erro:
         raise HTTPException(422, f'Não foi possível ler o ECG: {erro}')
+
+
+@app.post('/api/lote')
+async def analisar_lote(arquivos: list[UploadFile] = File(...),
+                        frequencia: float = Form(400),
+                        modo: str = Form('equilibrado'),
+                        formato: str = Form('json')):
+    """
+    Vários arquivos (o .hea e o .dat do WFDB juntos; um HDF5 conta todos os seus
+    exames). Devolve a fila na ordem de leitura: repetir, alterado, outra
+    alteração, normal. Arquivo ilegível vira uma linha com veredito 'erro'.
+    """
+    conteudos, total = {}, 0
+    for arquivo in arquivos:
+        conteudo = await arquivo.read()
+        total += len(conteudo)
+        if total > 4 * TAMANHO_MAXIMO_MB * 2**20:
+            raise HTTPException(413, f'Lote maior que {4 * TAMANHO_MAXIMO_MB} MB')
+        conteudos[arquivo.filename] = conteudo
+    if not 50 <= frequencia <= 5000:
+        raise HTTPException(422, 'Frequência de amostragem fora do esperado (50–5000 Hz)')
+    try:
+        exames = agrupar_exames(conteudos)
+    except OSError as erro:
+        raise HTTPException(422, f'Não foi possível abrir o lote: {erro}')
+    if len(exames) > MAXIMO_EXAMES_LOTE:
+        raise HTTPException(413, f'{len(exames)} exames no lote; o máximo é {MAXIMO_EXAMES_LOTE}')
+
+    fila = triar(exames, modelo, info, frequencia, validar_modo(modo))
+    if formato == 'csv':
+        return Response('\ufeff' + para_csv(fila), media_type='text/csv; charset=utf-8',
+                        headers={'Content-Disposition': 'attachment; filename="fila_triagem.csv"'})
+    contagem = {}
+    for linha in fila:
+        contagem[linha['veredito']] = contagem.get(linha['veredito'], 0) + 1
+    return {'modo': modo, 'total': len(fila), 'contagem': contagem, 'fila': fila}
 
 
 def validar_modo(modo):

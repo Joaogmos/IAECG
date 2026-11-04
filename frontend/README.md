@@ -59,6 +59,22 @@ par .hea/.dat), `frequencia`, `indice`, `modo`) devolvem:
 }
 ```
 
+`POST /api/lote` (multipart: `arquivos` (vários; o .hea e o .dat do WFDB juntos, um HDF5 vale por
+todos os seus exames), `frequencia`, `modo`, `formato` = `json` ou `csv`) analisa até 2.000 exames
+sem saliência e devolve a fila na ordem de leitura:
+
+```jsonc
+{
+  "modo": "equilibrado", "total": 827,
+  "contagem": {"alterado": 132, "outra_alteracao": 240, "normal": 455},
+  "fila": [{"posicao": 1, "exame": "ecg_tracings.hdf5#330", "veredito": "repetir" | "alterado" |
+            "outra_alteracao" | "normal" | "erro", "achados": "RBBB", "maior_prob": 0.98,
+            "p_1dAVb": 0.0001, ..., "p_Normal": 0.0001, "fc_bpm": 86.8, "observacao": "..."}, ...]
+}
+```
+
+Com `formato=csv` vem o mesmo conteúdo em CSV (`;`, UTF-8 com BOM), pronto para o Excel.
+
 Erros vêm com status 4xx e `{"detail": "mensagem em português"}`, que a interface mostra como está.
 
 ## Próximos passos sugeridos

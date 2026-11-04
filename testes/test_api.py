@@ -81,3 +81,15 @@ def test_triagem_em_lote(tmp_path):
     assert linhas[0]['exame'] == 'curto.npy' and linhas[-1]['exame'] == 'quebrado.csv'
     gravar(linhas, tmp_path / 'fila.csv')
     assert (tmp_path / 'fila.csv').read_text(encoding='utf-8-sig').startswith('posicao;exame')
+
+
+def test_lote_pela_api():
+    buffer = io.BytesIO()
+    np.save(buffer, ecg_sintetico())
+    arquivos = [('arquivos', ('a.npy', buffer.getvalue())), ('arquivos', ('b.csv', b'1,2\n'))]
+    r = cliente.post('/api/lote', data={'modo': 'triagem'}, files=arquivos)
+    assert r.status_code == 200, r.text
+    corpo = r.json()
+    assert corpo['total'] == 2 and corpo['fila'][-1]['veredito'] == 'erro'
+    csv = cliente.post('/api/lote', data={'formato': 'csv'}, files=arquivos)
+    assert csv.headers['content-type'].startswith('text/csv') and 'posicao;exame' in csv.text

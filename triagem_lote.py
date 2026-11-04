@@ -18,6 +18,7 @@
 # WFDB: o .hea e o .dat de mesmo nome são lidos juntos.
 # =============================================================================
 
+import io
 import os
 import csv
 import argparse
@@ -33,32 +34,44 @@ EXTENSOES = ('.hdf5', '.h5', '.npy', '.csv', '.txt', '.hea')
 ORDEM_VEREDITO = {'repetir': 0, 'alterado': 1, 'outra_alteracao': 2, 'normal': 3}
 
 
+def agrupar_exames(conteudos):
+    """
+    {nome_do_arquivo: bytes} -> [(identificação, {arquivo: bytes}, índice no HDF5)].
+    Junta o .hea e o .dat de mesmo nome e abre um HDF5 em todos os seus exames.
+    Usado aqui e no POST /api/lote.
+    """
+    exames = []
+    for nome, conteudo in conteudos.items():
+        base, extensao = os.path.splitext(nome)
+        extensao = extensao.lower()
+        if extensao == '.dat':
+            continue                                    # vai junto com o .hea
+        if extensao == '.hea':
+            par = {n: c for n, c in conteudos.items() if os.path.splitext(n)[0] == base}
+            exames.append((os.path.basename(base), par, 0))
+        elif extensao in ('.hdf5', '.h5'):
+            with h5py.File(io.BytesIO(conteudo), 'r') as f:
+                n = len(f['tracings'])
+            exames += [(f"{os.path.basename(nome)}#{i}", {nome: conteudo}, i) for i in range(n)]
+        else:
+            exames.append((os.path.basename(nome), {nome: conteudo}, 0))
+    return exames
+
+
 def listar_exames(caminhos):
-    """Devolve [(identificação, {arquivo: bytes}, índice no HDF5)] de arquivos e pastas."""
+    """Arquivos e pastas (com subpastas) -> exames, como em agrupar_exames."""
     arquivos = []
     for c in caminhos:
         if os.path.isdir(c):
             arquivos += sorted(f for f in glob(os.path.join(c, '**', '*'), recursive=True)
-                               if f.lower().endswith(EXTENSOES))
+                               if f.lower().endswith(EXTENSOES + ('.dat',)))
         else:
             arquivos.append(c)
-
-    exames = []
+    conteudos = {}
     for arquivo in arquivos:
-        extensao = os.path.splitext(arquivo)[1].lower()
-        if extensao == '.hea':
-            base = os.path.splitext(arquivo)[0]
-            par = {f: open(f, 'rb').read() for f in (arquivo, base + '.dat') if os.path.exists(f)}
-            exames.append((os.path.basename(base), par, 0))
-        elif extensao in ('.hdf5', '.h5'):
-            with h5py.File(arquivo, 'r') as f:
-                n = len(f['tracings'])
-            conteudo = open(arquivo, 'rb').read()
-            for i in range(n):
-                exames.append((f"{os.path.basename(arquivo)}#{i}", {arquivo: conteudo}, i))
-        else:
-            exames.append((os.path.basename(arquivo), {arquivo: open(arquivo, 'rb').read()}, 0))
-    return exames
+        with open(arquivo, 'rb') as f:
+            conteudos[arquivo] = f.read()
+    return agrupar_exames(conteudos)
 
 
 def triar(exames, modelo, info, frequencia, modo):
@@ -91,13 +104,21 @@ def triar(exames, modelo, info, frequencia, modo):
     return linhas
 
 
-def gravar(linhas, saida):
+def para_csv(linhas):
+    """Texto CSV com ';' (o Excel em português abre direto)."""
     colunas = ['posicao', 'exame', 'veredito', 'achados', 'maior_prob'] \
         + list(dict.fromkeys(k for l in linhas for k in l if k.startswith('p_'))) + ['fc_bpm', 'observacao']
-    with open(saida, 'w', newline='', encoding='utf-8-sig') as f:   # BOM: o Excel abre com acento
-        escritor = csv.DictWriter(f, fieldnames=colunas, delimiter=';', extrasaction='ignore')
-        escritor.writeheader()
-        escritor.writerows(linhas)
+    saida = io.StringIO()
+    escritor = csv.DictWriter(saida, fieldnames=colunas, delimiter=';', extrasaction='ignore',
+                              lineterminator='\n')
+    escritor.writeheader()
+    escritor.writerows(linhas)
+    return saida.getvalue()
+
+
+def gravar(linhas, arquivo):
+    with open(arquivo, 'w', newline='', encoding='utf-8-sig') as f:   # BOM: o Excel abre com acento
+        f.write(para_csv(linhas))
 
 
 if __name__ == '__main__':
