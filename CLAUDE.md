@@ -16,6 +16,8 @@ Projeto: IA que lê ECG de 12 derivações e aponta 6 alterações (1dAVb, RBBB,
 - `inferencia_ecg.py`: leitura de formatos (hdf5/npy/csv/WFDB), reamostragem, Einthoven,
   qualidade, FC/RR, saliência. `api_ecg.py` (FastAPI) serve isso e `frontend/`.
   `triagem_lote.py`: pasta ou HDF5 inteiro → fila em CSV (repetir, alterado, outra, normal).
+  `robustez_ecg.py`: CODE-test com ruído, linha de base, eletrodo solto etc. A inferência aplica
+  passa-alta de 0,5 Hz (o treino não), porque a linha de base é o defeito que mais derruba o F1.
 - `baixar_dados.py`, `treinar_todos.py`, `reavaliar_modelo.py`, `gerar_tabelas.py`, `figuras_relatorio.py`.
 - `testes/`: pytest com sinais sintéticos.
 Os scripts de modelo só definem a arquitetura e a LR; mudanças de treino vão em `comum_ecg.py`

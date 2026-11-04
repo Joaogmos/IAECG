@@ -5,7 +5,7 @@
 # Etapas, na ordem em que o exame passa:
 #   1. leitura do arquivo (HDF5 do CODE, .npy, .csv/.txt, WFDB .hea + .dat)
 #   2. reordenação das derivações para o padrão do treino
-#   3. reamostragem para 400 Hz e ajuste para 4.096 amostras
+#   3. reamostragem para 400 Hz, ajuste para 4.096 amostras e passa-alta de 0,5 Hz
 #   4. checagem de qualidade (derivação solta, sinal curto, saturação)
 #   5. medidas clássicas (FC e irregularidade do RR) para conferência
 #   6. probabilidades das 7 saídas + limiares escolhidos na validação
@@ -196,6 +196,18 @@ def ajustar_para_modelo(sinal, frequencia):
     return np.pad(sinal, ((falta // 2, falta - falta // 2), (0, 0))), duracao_s
 
 
+def remover_linha_de_base(sinal, corte_hz=0.5):
+    """
+    Passa-alta de 0,5 Hz (Butterworth de 2ª ordem, ida e volta), o filtro de linha
+    de base dos eletrocardiógrafos. No CODE-test com oscilação de 1 mV o F1 macro
+    vai de 0,60 para 0,81, e no exame original não piora (robustez_ecg.py).
+    Funciona em (amostras, 12) ou (exames, amostras, 12); o preenchimento continua zero.
+    """
+    sos = butter(2, corte_hz, btype='highpass', fs=FREQUENCIA_HZ, output='sos')
+    ativo = np.abs(sinal).sum(axis=-1, keepdims=True) > 0
+    return (sosfiltfilt(sos, sinal, axis=-2) * ativo).astype(np.float32)
+
+
 def corrigir_aumentadas(sinal):
     """
     Pela lei de Einthoven, aVR = -(DI+DII)/2, aVL = (DI-DIII)/2 e aVF = (DII+DIII)/2.
@@ -299,6 +311,7 @@ def analisar(sinal, frequencia, modelo, info, modo='equilibrado', fator_reducao=
     sinal, duracao_s = ajustar_para_modelo(orientar(sinal), frequencia)
     sinal, alerta_ordem = corrigir_aumentadas(sinal)
     qualidade = checar_qualidade(sinal, duracao_s)
+    sinal     = remover_linha_de_base(sinal)
     if alerta_ordem:
         qualidade['alertas'].append(alerta_ordem)
     ritmo     = medir_ritmo(sinal)
