@@ -164,6 +164,7 @@ function configurarEntrada() {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('arquivo-lote').click(); }
   });
   $('baixar-fila').addEventListener('click', baixarFila);
+  $('imprimir').addEventListener('click', () => window.print());
   $('voltar-fila').addEventListener('click', () => { estado.ultimaAnalise = null; mostrarFila(); });
   zona.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('arquivo').click(); }

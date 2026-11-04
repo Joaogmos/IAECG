@@ -81,6 +81,7 @@ Erros vêm com status 4xx e `{"detail": "mensagem em português"}`, que a interf
 
 - Tela de "como ler o resultado" para o médico (o que é limiar, o que é o modo triagem).
 - Zoom e rolagem no papel; régua para medir intervalos (PR, QRS) clicando em dois pontos.
-- Exportar o resultado em PDF para anexar ao prontuário (com o aviso de ferramenta de pesquisa).
+- O botão "Imprimir ou salvar em PDF" usa o `@media print` de `estilo.css` (só o exame, o veredito e o aviso).
+  Falta: cabeçalho com data, nome do arquivo e versão do modelo no impresso.
 - Modo escuro, que hoje não existe: o papel de ECG claro foi escolhido de propósito, mas o resto da tela pode escurecer.
 - Testar com leitor de tela; as barras de probabilidade já têm `aria-label`.
